@@ -9,27 +9,29 @@ dikurangi modal (HPP) dan biaya/fee masing-masing marketplace.
 ## Tech Stack
 
 ### Backend
-| Komponen        | Teknologi                     |
-|------------------|--------------------------------|
-| Framework        | Laravel 12                    |
-| Bahasa           | PHP >= 8.2                     |
-| Database         | MySQL                          |
-| Autentikasi API  | Laravel Sanctum (token-based) |
-| Arsitektur       | REST API, business logic di Service layer |
+
+| Komponen        | Teknologi                                 |
+| --------------- | ----------------------------------------- |
+| Framework       | Laravel 12                                |
+| Bahasa          | PHP >= 8.2                                |
+| Database        | MySQL                                     |
+| Autentikasi API | Laravel Sanctum (token-based)             |
+| Arsitektur      | REST API, business logic di Service layer |
 
 ### Frontend
-| Komponen        | Teknologi                     |
-|------------------|--------------------------------|
-| Framework        | React 18                       |
-| Build tool       | Vite                           |
-| Styling          | Tailwind CSS v4                |
-| Routing          | React Router v6                |
-| HTTP client      | Axios                          |
-| Chart            | Recharts                       |
 
-### Desain
+| Komponen    | Teknologi       |
+| ----------- | --------------- |
+| Framework   | React 18        |
+| Build tool  | Vite            |
+| Styling     | Tailwind CSS v4 |
+| Routing     | React Router v6 |
+| HTTP client | Axios           |
+| Chart       | Recharts        |
+
+<!-- ### Desain
 Referensi tampilan (mockup statis) ada di `desain/dashboard_marketplace_profit_monitoring/code.html`.
-Semua warna, font, dan spacing di frontend React diambil langsung dari file ini.
+Semua warna, font, dan spacing di frontend React diambil langsung dari file ini. -->
 
 ---
 
@@ -130,9 +132,9 @@ Frontend akan aktif di **http://localhost:5173**.
 
 Buka `http://localhost:5173`, login dengan akun dari seeder:
 
-| Email                | Password  |
-|-----------------------|-----------|
-| admin@example.com     | password  |
+| Email             | Password |
+| ----------------- | -------- |
+| admin@example.com | password |
 
 ---
 
@@ -162,22 +164,23 @@ cd frontend && npm run dev
 ## Endpoint API Utama
 
 Semua endpoint (kecuali `/login`) butuh header:
+
 ```
 Authorization: Bearer <token>
 ```
 
-| Method | Endpoint                          | Keterangan                        |
-|--------|-------------------------------------|------------------------------------|
-| POST   | `/api/login`                       | Login, dapat token                 |
-| GET    | `/api/dashboard`                   | Ringkasan profit + breakdown channel |
-| GET/POST | `/api/products`                  | CRUD produk                        |
-| GET/POST | `/api/suppliers`                 | CRUD supplier                      |
-| GET/POST | `/api/purchases`                 | Pembelian (stok bertambah)         |
-| GET/POST | `/api/marketplaces`              | CRUD marketplace + fee             |
-| GET/POST | `/api/sales`                     | Penjualan (stok berkurang, fee dihitung) |
-| POST   | `/api/sales/{id}/complete`         | Tandai transaksi selesai           |
-| POST   | `/api/sales/{id}/cancel`           | Batalkan transaksi (stok kembali)  |
-| GET    | `/api/stock-histories`             | Jejak audit pergerakan stok        |
+| Method   | Endpoint                   | Keterangan                               |
+| -------- | -------------------------- | ---------------------------------------- |
+| POST     | `/api/login`               | Login, dapat token                       |
+| GET      | `/api/dashboard`           | Ringkasan profit + breakdown channel     |
+| GET/POST | `/api/products`            | CRUD produk                              |
+| GET/POST | `/api/suppliers`           | CRUD supplier                            |
+| GET/POST | `/api/purchases`           | Pembelian (stok bertambah)               |
+| GET/POST | `/api/marketplaces`        | CRUD marketplace + fee                   |
+| GET/POST | `/api/sales`               | Penjualan (stok berkurang, fee dihitung) |
+| POST     | `/api/sales/{id}/complete` | Tandai transaksi selesai                 |
+| POST     | `/api/sales/{id}/cancel`   | Batalkan transaksi (stok kembali)        |
+| GET      | `/api/stock-histories`     | Jejak audit pergerakan stok              |
 
 ---
 
@@ -203,9 +206,9 @@ bash test-api.sh
 
 ## Troubleshooting Singkat
 
-| Gejala | Kemungkinan Penyebab |
-|--------|------------------------|
+| Gejala                                                                | Kemungkinan Penyebab                                                                                                                                       |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Ikon di sidebar muncul sebagai teks (`dashboard`, `inventory_2`, dst) | Font Material Symbols gagal dimuat — cek `index.html` sudah punya `<link>` font, dan `.material-symbols-outlined` di `index.css` sudah punya `font-family` |
-| Dashboard menampilkan `Rp 0` semua | Belum ada transaksi `sales` berstatus `completed` dalam rentang filter tanggal aktif |
-| `Table 'products' already exists` saat migrate | Ada migration duplikat (nama sama, timestamp beda) — hapus salah satu |
-| CORS error di browser saat frontend fetch API | Cek `backend/config/cors.php`, pastikan `http://localhost:5173` ada di `allowed_origins` |
+| Dashboard menampilkan `Rp 0` semua                                    | Belum ada transaksi `sales` berstatus `completed` dalam rentang filter tanggal aktif                                                                       |
+| `Table 'products' already exists` saat migrate                        | Ada migration duplikat (nama sama, timestamp beda) — hapus salah satu                                                                                      |
+| CORS error di browser saat frontend fetch API                         | Cek `backend/config/cors.php`, pastikan `http://localhost:5173` ada di `allowed_origins`                                                                   |
