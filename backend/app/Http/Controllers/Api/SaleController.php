@@ -10,23 +10,59 @@ use Illuminate\Http\Request;
 
 class SaleController extends Controller
 {
-    public function __construct(private SaleService $saleService)
-    {
-    }
+    public function __construct(private SaleService $saleService) {}
 
     public function index(Request $request)
     {
-        $query = Sale::with(['marketplace', 'items.product']);
+        // items_count dipakai frontend untuk menampilkan jumlah item per pesanan
+        $query = Sale::with('marketplace')->withCount('items');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                    ->orWhereHas('marketplace', function ($marketplaceQuery) use ($search) {
+                        $marketplaceQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
+        // if ($request->filled('marketplace_id')) {
+        //     $query->where('marketplace_id', $request->marketplace_id);
+        // }
+
+        // return response()->json(
+        //     $query
+        //         ->orderByDesc('sale_date')
+        //         ->orderByDesc('id')
+        //         ->paginate(20)
+        // );
         if ($request->filled('marketplace_id')) {
             $query->where('marketplace_id', $request->marketplace_id);
         }
 
-        return response()->json($query->latest()->paginate(20));
+        // Rentang tanggal dipakai bersama oleh Dashboard (filter) dan tombol Export
+        if ($request->filled('date_from')) {
+            $query->whereDate('sale_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('sale_date', '<=', $request->date_to);
+        }
+
+        $query->orderByDesc('sale_date')->orderByDesc('id');
+
+        // Dipakai tombol Export: kirim SEMUA baris yang cocok filter, tanpa paginasi
+        if ($request->boolean('all')) {
+            return response()->json($query->get());
+        }
+
+        return response()->json($query->paginate(20));
     }
 
     public function store(SaleRequest $request)
@@ -38,7 +74,9 @@ class SaleController extends Controller
 
     public function show(Sale $sale)
     {
-        return response()->json($sale->load(['marketplace', 'items.product', 'fees']));
+        return response()->json(
+            $sale->load(['marketplace', 'items.productVariant.product', 'fees'])
+        );
     }
 
     /**

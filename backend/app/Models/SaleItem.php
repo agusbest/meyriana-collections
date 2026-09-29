@@ -10,7 +10,13 @@ class SaleItem extends Model
     use HasFactory;
 
     protected $fillable = [
-        'sale_id', 'product_id', 'qty', 'selling_price', 'cost_price', 'subtotal', 'cost_total',
+        'sale_id',
+        'product_variant_id',
+        'qty',
+        'selling_price',
+        'cost_price',
+        'subtotal',
+        'cost_total',
     ];
 
     protected $casts = [
@@ -25,8 +31,8 @@ class SaleItem extends Model
         return $this->belongsTo(Sale::class);
     }
 
-    public function product()
+    public function productVariant()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 }

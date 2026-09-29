@@ -9,9 +9,10 @@ class PurchaseItem extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['purchase_id', 'product_id', 'qty', 'price', 'subtotal'];
+    protected $fillable = ['purchase_id', 'product_variant_id', 'qty', 'price', 'subtotal'];
 
     protected $casts = [
+        'qty' => 'integer',
         'price' => 'decimal:2',
         'subtotal' => 'decimal:2',
     ];
@@ -21,8 +22,8 @@ class PurchaseItem extends Model
         return $this->belongsTo(Purchase::class);
     }
 
-    public function product()
+    public function productVariant()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(ProductVariant::class);
     }
 }

@@ -10,12 +10,18 @@ class StockHistory extends Model
     use HasFactory;
 
     protected $fillable = [
-        'product_id', 'type', 'qty', 'stock_before', 'stock_after', 'reference_type', 'reference_id',
+        'product_variant_id',
+        'type',
+        'qty',
+        'stock_before',
+        'stock_after',
+        'reference_type',
+        'reference_id',
     ];
 
-    public function product()
+    public function productVariant()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 
     public function reference()

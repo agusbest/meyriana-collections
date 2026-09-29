@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\MarketplaceFee;
-use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Sale;
 use App\Models\StockHistory;
 use Illuminate\Support\Facades\DB;
@@ -18,12 +18,33 @@ class SaleService
     public function create(array $data): Sale
     {
         return DB::transaction(function () use ($data) {
-            // 1. Validasi stok cukup untuk semua item sebelum memproses apa pun
-            foreach ($data['items'] as $item) {
-                $product = Product::findOrFail($item['product_id']);
-                if ($product->stock < $item['qty']) {
+            // Total qty diminta per variasi (baris ganda pada variasi yang sama dijumlahkan)
+            $required = collect($data['items'])
+                ->groupBy('product_variant_id')
+                ->map(fn ($rows) => (int) $rows->sum('qty'));
+
+            // Kunci baris variasi dengan urutan id tetap supaya tidak saling menunggu (deadlock)
+            $variants = ProductVariant::with('product')
+                ->whereIn('id', $required->keys())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            // 1. Validasi stok cukup untuk semua variasi sebelum memproses apa pun
+            foreach ($required as $variantId => $qty) {
+                $variant = $variants->get($variantId);
+
+                if (! $variant) {
                     throw ValidationException::withMessages([
-                        'stock' => "Stok {$product->name} tidak mencukupi",
+                        'items' => 'Variasi produk tidak ditemukan.',
+                    ]);
+                }
+
+                if ((int) $variant->stock < $qty) {
+                    throw ValidationException::withMessages([
+                        'items' => "Stok {$this->label($variant)} tidak mencukupi "
+                            . "(tersisa {$variant->stock}, diminta {$qty}).",
                     ]);
                 }
             }
@@ -38,30 +59,35 @@ class SaleService
                 'status' => 'pending',
             ]);
 
-            // 2. Buat sale_items, ambil harga modal sebagai snapshot, kurangi stok
+            // 2. Buat sale_items, ambil HPP variasi sebagai snapshot, kurangi stok
             foreach ($data['items'] as $item) {
-                $product = Product::findOrFail($item['product_id']);
-                $subtotal = $item['qty'] * $item['selling_price'];
-                $costTotal = $item['qty'] * (float) $product->purchase_price;
+                $variant = $variants->get((int) $item['product_variant_id']);
+
+                $qty = (int) $item['qty'];
+                $price = (float) $item['selling_price'];
+                $subtotal = $qty * $price;
+                $costTotal = $qty * (float) $variant->purchase_price;
 
                 $sale->items()->create([
-                    'product_id' => $product->id,
-                    'qty' => $item['qty'],
-                    'selling_price' => $item['selling_price'],
-                    'cost_price' => $product->purchase_price, // snapshot
+                    'product_variant_id' => $variant->id,
+                    'qty' => $qty,
+                    'selling_price' => $price,
+                    'cost_price' => $variant->purchase_price, // snapshot
                     'subtotal' => $subtotal,
                     'cost_total' => $costTotal,
                 ]);
 
-                $before = $product->stock;
-                $product->decrement('stock', $item['qty']);
+                $before = (int) $variant->stock;
+
+                // decrement memperbarui stok di database sekaligus di objek $variant
+                $variant->decrement('stock', $qty);
 
                 StockHistory::create([
-                    'product_id' => $product->id,
+                    'product_variant_id' => $variant->id,
                     'type' => 'sale_out',
-                    'qty' => -$item['qty'],
+                    'qty' => -$qty,
                     'stock_before' => $before,
-                    'stock_after' => $before - $item['qty'],
+                    'stock_after' => $before - $qty,
                     'reference_type' => Sale::class,
                     'reference_id' => $sale->id,
                 ]);
@@ -90,7 +116,7 @@ class SaleService
                 $marketplaceFeeTotal += $amount;
             }
 
-            $otherFee = $data['other_fee'] ?? 0;
+            $otherFee = (float) ($data['other_fee'] ?? 0);
             $profit = $totalSales - $totalCost - $marketplaceFeeTotal - $otherFee;
 
             $sale->update([
@@ -101,7 +127,7 @@ class SaleService
                 'profit' => $profit,
             ]);
 
-            return $sale->load(['items', 'fees']);
+            return $sale->load(['marketplace', 'items.productVariant.product', 'fees']);
         });
     }
 
@@ -118,13 +144,23 @@ class SaleService
     public function cancel(Sale $sale): Sale
     {
         return DB::transaction(function () use ($sale) {
-            foreach ($sale->items as $item) {
-                $product = $item->product;
-                $before = $product->stock;
-                $product->increment('stock', $item->qty);
+            $sale->load('items');
+
+            foreach ($sale->items->sortBy('product_variant_id') as $item) {
+                // Data penjualan lama (sebelum ada variasi) tidak punya variasi untuk dikembalikan stoknya
+                if (! $item->product_variant_id) {
+                    continue;
+                }
+
+                $variant = ProductVariant::lockForUpdate()
+                    ->findOrFail($item->product_variant_id);
+
+                $before = (int) $variant->stock;
+
+                $variant->increment('stock', $item->qty);
 
                 StockHistory::create([
-                    'product_id' => $product->id,
+                    'product_variant_id' => $variant->id,
                     'type' => 'sale_cancel_in',
                     'qty' => $item->qty,
                     'stock_before' => $before,
@@ -136,7 +172,14 @@ class SaleService
 
             $sale->update(['status' => 'cancelled']);
 
-            return $sale;
+            return $sale->load(['marketplace', 'items.productVariant.product', 'fees']);
         });
+    }
+
+    private function label(ProductVariant $variant): string
+    {
+        $options = collect([$variant->color, $variant->size])->filter()->implode(' / ');
+
+        return trim(($variant->product?->name ?? 'Produk') . ' ' . $options);
     }
 }

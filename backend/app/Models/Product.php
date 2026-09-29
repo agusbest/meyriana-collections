@@ -10,12 +10,13 @@ class Product extends Model
     use HasFactory;
 
     protected $fillable = [
-        'sku', 'name', 'category', 'purchase_price', 'selling_price', 'stock', 'is_active',
+        'sku',
+        'name',
+        'category',
+        'is_active',
     ];
 
     protected $casts = [
-        'purchase_price' => 'decimal:2',
-        'selling_price' => 'decimal:2',
         'is_active' => 'boolean',
     ];
 
@@ -32,5 +33,15 @@ class Product extends Model
     public function stockHistories()
     {
         return $this->hasMany(StockHistory::class);
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class);
     }
 }

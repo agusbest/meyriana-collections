@@ -11,7 +11,7 @@ class MarketplaceFeeController extends Controller
 {
     public function index(Marketplace $marketplace)
     {
-        return response()->json($marketplace->fees);
+        return response()->json($marketplace->fees()->orderBy('id')->get());
     }
 
     public function store(MarketplaceFeeRequest $request, Marketplace $marketplace)
@@ -28,6 +28,10 @@ class MarketplaceFeeController extends Controller
         return response()->json($fee);
     }
 
+    /**
+     * Aman dihapus: penjualan lama menyimpan salinan fee (sale_fees) sendiri,
+     * jadi histori profit tidak berubah.
+     */
     public function destroy(MarketplaceFee $fee)
     {
         $fee->delete();

@@ -27,7 +27,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('suppliers', SupplierController::class);
 
     // Purchases (tidak ada update/destroy di V1 - histori dikunci)
-    Route::apiResource('purchases', PurchaseController::class)->only(['index', 'store', 'show']);
+    // Route::apiResource('purchases', PurchaseController::class)->only(['index', 'store', 'show']);
+    Route::apiResource('purchases', PurchaseController::class);
 
     // Marketplaces + nested fees
     Route::apiResource('marketplaces', MarketplaceController::class);

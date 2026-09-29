@@ -10,13 +10,20 @@ class Sale extends Model
     use HasFactory;
 
     protected $fillable = [
-        'order_number', 'marketplace_id', 'sale_date',
-        'total_sales', 'total_cost', 'marketplace_fee', 'other_fee', 'profit',
-        'status', 'completed_at',
+        'order_number',
+        'marketplace_id',
+        'sale_date',
+        'total_sales',
+        'total_cost',
+        'marketplace_fee',
+        'other_fee',
+        'profit',
+        'status',
+        'completed_at',
     ];
 
     protected $casts = [
-        'sale_date' => 'date',
+        'sale_date' => 'date:Y-m-d',
         'total_sales' => 'decimal:2',
         'total_cost' => 'decimal:2',
         'marketplace_fee' => 'decimal:2',

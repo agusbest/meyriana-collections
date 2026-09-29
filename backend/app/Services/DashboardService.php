@@ -18,7 +18,7 @@ class DashboardService
 
         return [
             'total_products' => Product::count(),
-            'total_stock' => (int) Product::sum('stock'),
+            'total_stock' => (int) \App\Models\ProductVariant::sum('stock'),
             'total_sales' => (float) $completed->sum('total_sales'),
             'marketplace_fee' => (float) $completed->sum('marketplace_fee'),
             'real_profit' => (float) $completed->sum('profit'),

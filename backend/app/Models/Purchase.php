@@ -12,7 +12,7 @@ class Purchase extends Model
     protected $fillable = ['invoice_number', 'supplier_id', 'purchase_date', 'total_amount'];
 
     protected $casts = [
-        'purchase_date' => 'date',
+        'purchase_date' => 'date:Y-m-d',
         'total_amount' => 'decimal:2',
     ];
 

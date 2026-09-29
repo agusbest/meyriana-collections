@@ -1,0 +1,3 @@
+# Paksa file shell script pakai line ending LF (wajib untuk Docker/Linux)
+*.sh text eol=lf
+Dockerfile text eol=lf
