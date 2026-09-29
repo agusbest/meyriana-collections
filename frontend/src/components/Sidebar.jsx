@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const menu = [
@@ -13,6 +14,17 @@ const menu = [
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const { logout } = useAuth();
+
+  const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    await logout();
+    setSidebarOpen(false);
+    navigate("/login", { replace: true });
+  };
 
   const handleMenuClick = () => {
     if (window.innerWidth < 1024) {
@@ -107,14 +119,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           </NavLink> */}
 
           <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error-container/20"
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-error hover:bg-error-container/20 disabled:opacity-60"
           >
             <span className="material-symbols-outlined text-[19px]">
               logout
             </span>
-
-            <span>Logout</span>
+            <span>{loggingOut ? "Keluar..." : "Logout"}</span>
           </button>
         </div>
       </aside>
