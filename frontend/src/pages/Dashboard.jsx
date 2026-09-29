@@ -149,10 +149,10 @@ export default function Dashboard() {
           </h1>
           <p className="text-on-surface-variant mt-1">
             Ringkasan performa penjualan kotor, estimasi potongan biaya
-            admin/layanan, dan laba bersih riil.
+            admin/layanan, dan laba bersih.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1.5">
+        {/* <div className="flex flex-col items-end gap-1.5">
           <div className="flex items-center gap-2.5">
             <button
               type="button"
@@ -169,7 +169,7 @@ export default function Dashboard() {
           {exportError && (
             <span className="text-xs text-error">{exportError}</span>
           )}
-        </div>
+        </div> */}
       </section>
 
       {/* Filter Bar */}

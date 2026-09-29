@@ -45,14 +45,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
       <aside
         className={`
           bg-inverse-surface border-r border-outline-variant
-          w-64 fixed left-0 top-0 h-screen
+          w-64 fixed left-0 top-0 h-[100dvh]
           flex flex-col justify-between p-4 z-50
           transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0
         `}
       >
-        <div>
+        <div className="flex-1 min-h-0 flex flex-col">
           {/* Header Sidebar */}
           <div className="flex items-center gap-3 px-2 py-3 mb-6">
             <img
@@ -79,7 +79,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-1.5 flex-1 overflow-y-auto">
             {menu.map((item) => (
               <NavLink
                 key={item.to}
@@ -105,7 +105,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         </div>
 
         {/* Bottom Menu */}
-        <div className="pt-4 border-t border-white/10 space-y-1.5">
+        <div className="shrink-0 pt-4 pb-[env(safe-area-inset-bottom)] border-t border-white/10 space-y-1.5">
           {/* <NavLink
             to="/settings/fees"
             onClick={handleMenuClick}
