@@ -11,10 +11,18 @@ class MarketplaceFeeService
      * Sengaja dipisah jadi service agar basis perhitungan mudah
      * diganti di masa depan tanpa menyentuh SaleService.
      */
+    // public function calculate(MarketplaceFee $fee, float $basis): float
+    // {
+    //     return $fee->type === 'percentage'
+    //         ? round($basis * (float) $fee->value / 100, 2)
+    //         : (float) $fee->value;
+    // }
     public function calculate(MarketplaceFee $fee, float $basis): float
     {
-        return $fee->type === 'percentage'
-            ? round($basis * (float) $fee->value / 100, 2)
-            : (float) $fee->value;
+        if ($fee->type === 'percentage') {
+            return round(round($basis * (float) $fee->value / 100, 6));
+        }
+
+        return (float) $fee->value;
     }
 }

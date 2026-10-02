@@ -15,10 +15,17 @@ function formatFeeValue(fee) {
 }
 
 // Rumus yang sama dengan backend (MarketplaceFeeService)
+// function calcFee(fee, revenue) {
+//   return fee.type === "percentage"
+//     ? (revenue * Number(fee.value)) / 100
+//     : Number(fee.value);
+// }
 function calcFee(fee, revenue) {
-  return fee.type === "percentage"
-    ? (revenue * Number(fee.value)) / 100
-    : Number(fee.value);
+  if (fee.type !== "percentage") {
+    return Number(fee.value);
+  }
+
+  return Math.round(Number(((revenue * Number(fee.value)) / 100).toFixed(6)));
 }
 
 function Switch({ checked, onChange, disabled, label }) {

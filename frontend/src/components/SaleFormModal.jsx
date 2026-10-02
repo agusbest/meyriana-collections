@@ -266,7 +266,9 @@ export default function SaleFormModal({ open, onClose, onSaved }) {
     const cost = form.items.reduce((total, item) => {
       const variant = variantById.get(String(item.product_variant_id));
 
-      return total + Number(item.qty || 0) * Number(variant?.purchase_price ?? 0);
+      return (
+        total + Number(item.qty || 0) * Number(variant?.purchase_price ?? 0)
+      );
     }, 0);
 
     const marketplace = marketplaces.find(
@@ -278,8 +280,11 @@ export default function SaleFormModal({ open, onClose, onSaved }) {
       .reduce(
         (total, f) =>
           total +
+          // (f.type === "percentage"
+          //   ? (revenue * Number(f.value)) / 100
+          //   : Number(f.value)),
           (f.type === "percentage"
-            ? (revenue * Number(f.value)) / 100
+            ? Math.round(Number(((revenue * Number(f.value)) / 100).toFixed(6)))
             : Number(f.value)),
         0,
       );
