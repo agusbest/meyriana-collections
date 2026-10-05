@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import client from "../api/client";
 import ProductFormModal from "../components/ProductFormModal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import ActionButtons from "../components/ActionButtons";
 
 function formatRupiah(n) {
   return "Rp " + Number(n ?? 0).toLocaleString("id-ID");
@@ -556,7 +557,9 @@ export default function Products() {
                 <th className="py-3 px-4 text-right">Harga Jual</th>
                 <th className="py-3 px-4 text-right">Total Stok</th>
                 <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-center">Aksi</th>
+                <th className="py-3 px-2 text-center w-px whitespace-nowrap">
+                  Aksi
+                </th>
               </tr>
             </thead>
 
@@ -609,9 +612,9 @@ export default function Products() {
                               {product.name}
                             </p>
 
-                            <p className="text-xs text-on-surface-variant">
+                            {/* <p className="text-xs text-on-surface-variant">
                               {variants.length} variasi aktif
-                            </p>
+                            </p> */}
                           </div>
                         </div>
                       </td>
@@ -659,44 +662,12 @@ export default function Products() {
                       </td>
 
                       {/* Aksi */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1">
-                          {/* View */}
-                          <button
-                            type="button"
-                            onClick={() => openView(product)}
-                            title="Lihat Detail"
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">
-                              visibility
-                            </span>
-                          </button>
-
-                          {/* Edit */}
-                          <button
-                            type="button"
-                            onClick={() => openEdit(product)}
-                            title="Edit"
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">
-                              edit
-                            </span>
-                          </button>
-
-                          {/* Delete */}
-                          <button
-                            type="button"
-                            onClick={() => askDelete(product)}
-                            title="Hapus"
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:bg-error-container/40 hover:text-error transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">
-                              delete
-                            </span>
-                          </button>
-                        </div>
+                      <td className="py-3 px-2 w-px whitespace-nowrap">
+                        <ActionButtons
+                          onView={() => openView(product)}
+                          onEdit={() => openEdit(product)}
+                          onDelete={() => askDelete(product)}
+                        />
                       </td>
                     </tr>
                   );

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\StockHistoryController;
 use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\MarketplaceListingController;
 use Illuminate\Support\Facades\Route;
 
 // Public
@@ -46,4 +47,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // Listing Marketplace
+    Route::get('/marketplace-listings', [MarketplaceListingController::class, 'index']);
+    Route::post('/marketplace-listings/import', [MarketplaceListingController::class, 'import']);
+    Route::post('/marketplace-listings/mapping', [MarketplaceListingController::class, 'map']);
+    Route::post('/marketplace-listings/unmap', [MarketplaceListingController::class, 'unmap']);
+    Route::get('/marketplace-listings/unmapped', [MarketplaceListingController::class, 'unmapped']);
+    Route::post('/marketplace-listings/auto-map', [MarketplaceListingController::class, 'autoMap']);
+    Route::post('/marketplace-listings/setup', [MarketplaceListingController::class, 'setup']);
 });

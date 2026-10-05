@@ -18,7 +18,7 @@ export default function Topbar({ sidebarOpen, setSidebarOpen }) {
         </button>
 
         <span className="font-display font-bold text-base sm:text-lg text-on-surface truncate">
-          Meyriana Collection Management System
+          Meyriana Collection
         </span>
 
         <span className="px-2 py-0.5 rounded-full text-xs bg-primary-container text-on-primary-container font-semibold shrink-0">

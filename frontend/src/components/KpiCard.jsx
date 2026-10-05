@@ -13,6 +13,7 @@ const TONE_STYLES = {
     glow: "bg-emerald-400/25",
   },
   rose: { icon: "bg-rose-500/10 text-rose-600", glow: "bg-rose-400/25" },
+  teal: { icon: "bg-teal-500/10 text-teal-600", glow: "bg-teal-400/25" },
   slate: { icon: "bg-slate-500/10 text-slate-600", glow: "bg-slate-400/20" },
 };
 
@@ -69,7 +70,10 @@ export default function KpiCard({
       </div>
 
       <div className="relative mt-3 flex items-baseline gap-2">
-        <span className="text-3xl font-bold font-tnum text-on-surface">
+        {/* Nominal panjang (mis. Rp 125.000.000) pakai huruf sedikit lebih kecil supaya tidak keluar kartu */}
+        <span
+          className={`${String(value ?? "").length > 13 ? "text-2xl" : "text-3xl"} font-bold font-tnum text-on-surface break-words`}
+        >
           {value}
         </span>
         {suffix && <span className="text-sm text-outline">{suffix}</span>}

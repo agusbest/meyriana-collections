@@ -34,14 +34,14 @@ export default function Login() {
         <div className="flex flex-col items-center text-center gap-2 mb-6">
           <img
             src="/logo.png"
-            alt="SIMPRO"
+            alt="Meyriana-Collection"
             className="w-20 h-20 rounded-2xl shadow-sm"
           />
-          <div>
+          {/* <div>
             <h3 className="font-display font-bold text-on-surface leading-tight">
               Meyriana Collection Management System
             </h3>
-          </div>
+          </div> */}
         </div>
 
         {error && <p className="text-sm text-error">{error}</p>}

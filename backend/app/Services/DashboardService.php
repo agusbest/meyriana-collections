@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Marketplace;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Sale;
+use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
@@ -25,6 +27,14 @@ class DashboardService
             'pending_transactions' => (clone $pending)->count(),
             'estimated_pending_profit' => (float) $pending->sum('profit'),
             'by_marketplace' => $this->byMarketplace($filters),
+            // Nilai stok gudang saat ini (stok x HPP). Tidak ikut filter tanggal/marketplace.
+            'stock_value' => (float) ProductVariant::where('stock', '>', 0)
+                ->sum(DB::raw('stock * purchase_price')),
+
+            // Varian yang masih ada stoknya tapi HPP belum diisi (nilai stok jadi kurang lengkap)
+            'stock_without_hpp' => ProductVariant::where('stock', '>', 0)
+                ->where('purchase_price', '<=', 0)
+                ->count(),
         ];
     }
 

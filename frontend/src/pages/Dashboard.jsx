@@ -176,6 +176,7 @@ export default function Dashboard() {
       <FilterBar marketplaces={marketplaces} onApply={loadDashboard} />
 
       {/* KPI Cards - Baris 1: Aset & Inventori */}
+      {/* KPI Cards - Baris 1: Aset gudang (nilai saat ini, tidak ikut filter tanggal/marketplace) */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiCard
           label="Total Produk"
@@ -183,29 +184,43 @@ export default function Dashboard() {
           tone="blue"
           value={summary.total_products}
           suffix="SKU aktif"
-          // badge="+4 produk baru"
-          // badgeColor="emerald"
-          // note="Terdistribusi di beberapa marketplace"
-          // noteIcon="inventory"
         />
         <KpiCard
           label="Total Stok"
           icon="package_2"
           tone="violet"
-          value={summary.total_stock.toLocaleString("id-ID")}
-          suffix="Unit siap kirim"
+          value={Number(summary.total_stock ?? 0).toLocaleString("id-ID")}
+          suffix="pcs di gudang"
         />
+        <KpiCard
+          label="Nilai Stok Gudang"
+          icon="warehouse"
+          tone="teal"
+          value={formatRupiah(summary.stock_value)}
+          badge={
+            summary.stock_without_hpp > 0
+              ? `${summary.stock_without_hpp} tanpa HPP`
+              : "Stok × HPP"
+          }
+          badgeColor={summary.stock_without_hpp > 0 ? "amber" : "neutral"}
+          note={
+            summary.stock_without_hpp > 0
+              ? `${summary.stock_without_hpp} varian berstok belum ada HPP, isi di menu Produk`
+              : "Modal yang tertanam di stok saat ini"
+          }
+          noteIcon={summary.stock_without_hpp > 0 ? "warning" : "info"}
+        />
+      </section>
+
+      {/* KPI Cards - Baris 2: Penjualan & profit (ikut filter) */}
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard
           label="Penjualan (Gross)"
           icon="payments"
           tone="sky"
           value={formatRupiah(summary.total_sales)}
-          note="Total omzet dari transaksi completed"
+          note="Omzet transaksi completed"
         />
-      </section>
-
-      {/* KPI Cards - Baris 2: Finansial & Profit */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiCard
           label="Biaya Marketplace"
           icon="percent"
@@ -221,7 +236,7 @@ export default function Dashboard() {
           value={formatRupiah(summary.real_profit)}
           badge="Bersih"
           badgeColor="emerald"
-          note="Bersih setelah potong HPP & fee platform"
+          note="Setelah potong HPP & fee"
           noteIcon="verified"
         />
         <KpiCard

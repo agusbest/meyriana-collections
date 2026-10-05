@@ -116,6 +116,18 @@ class ProductController extends Controller
             ], 409);
         }
 
+        $usedInListings = \App\Models\ListingComponent::whereIn(
+            'product_variant_id',
+            $product->variants()->pluck('id')
+        )->exists();
+
+        if ($usedInListings) {
+            return response()->json([
+                'message' => 'Produk ini dipakai di pemetaan Listing Marketplace. '
+                    . 'Ubah pemetaannya dulu, atau nonaktifkan produknya saja.',
+            ], 409);
+        }
+
         DB::transaction(function () use ($product) {
             foreach ($product->variants as $variant) {
                 if ($variant->image_path) {

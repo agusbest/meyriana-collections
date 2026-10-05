@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import client from "../api/client";
 import PurchaseFormModal from "../components/PurchaseFormModal";
 import PurchaseDetailModal from "../components/PurchaseDetailModal";
+import ActionButtons from "../components/ActionButtons";
 
 function formatRupiah(n) {
   return "Rp " + Number(n ?? 0).toLocaleString("id-ID");
@@ -141,7 +142,9 @@ export default function Purchases() {
                 <th className="py-3 px-4">Tanggal</th>
                 <th className="py-3 px-4 text-center">Jumlah Item</th>
                 <th className="py-3 px-4 text-right">Total</th>
-                <th className="py-3 px-4 text-center">Aksi</th>
+                <th className="py-3 px-2 text-center w-px whitespace-nowrap">
+                  Aksi
+                </th>
               </tr>
             </thead>
 
@@ -191,7 +194,7 @@ export default function Purchases() {
                       {formatRupiah(purchase.total_amount)}
                     </td>
 
-                    <td className="py-3 px-4">
+                    {/* <td className="py-3 px-4">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
@@ -226,6 +229,13 @@ export default function Purchases() {
                           </span>
                         </button>
                       </div>
+                    </td> */}
+                    <td className="py-3 px-2 w-px whitespace-nowrap">
+                      <ActionButtons
+                        onView={() => openView(purchase)}
+                        onEdit={() => openEdit(purchase)}
+                        onDelete={() => handleDelete(purchase)}
+                      />
                     </td>
                   </tr>
                 ))}
