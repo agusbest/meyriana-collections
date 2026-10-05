@@ -168,25 +168,64 @@ class ListingMappingService
         });
     }
 
+    // Awalan jumlah paket di nama variasi: "3 PCS", "2 Setel", "18 PCS - KMB 01", "12 PCS COKLAT,M"
+    private const PACK_RE = '~^\s*(\d{1,3})\s*(pcs|pc|setelan|setel|stel|set|pasang|psg|lusin|potong|ptg)\b[\s\-–—/:.,]*~iu';
+
+    // Nama ukuran murni: "M", "XL", "NB", "0-3 BULAN", "6-12", "3 Bulan"
+    private const SIZE_RE = '~^(nb|new\s*born|xxs|xs|s|m|l|xl|xxl|xxxl|\d{1,2}\s*-\s*\d{1,2}(\s*(bln|bulan|m|th|tahun))?|\d{1,2}\s*(bln|bulan|th|tahun))$~iu';
+
     /**
-     * "Coklat Rainbow,XL" -> ["Coklat Rainbow", "XL"]; "Autumn" -> ["Autumn", null]; "" / "-" -> [null, null]
+     * Memecah nama variasi marketplace jadi [warna, ukuran]. Sama persis dengan parseVariation di frontend.
+     *   "Coklat Rainbow,XL"   -> ["Coklat Rainbow", "XL"]
+     *   "Autumn"              -> ["Autumn", null]
+     *   "3 PCS" / "18 Pcs"    -> [null, null]   (itu ukuran paket, bukan warna)
+     *   "18 PCS - KMB 01"     -> ["KMB 01", null]
+     *   "3 Setelan Panjang"   -> ["Panjang", null]
+     *   "XL" / "0-3 BULAN"    -> [null, "XL"]
      */
     public static function parseVariation(?string $name): array
     {
-        $name = trim((string) $name);
+        $text = self::trimAll($name);
 
-        if ($name === '' || $name === '-') {
+        if ($text === '' || $text === '-') {
             return [null, null];
         }
 
-        $parts = array_map('trim', explode(',', $name, 2));
+        if (preg_match(self::PACK_RE, $text, $match)) {
+            $text = self::trimAll(substr($text, strlen($match[0])));
+        }
 
-        return [self::clean($parts[0]), self::clean($parts[1] ?? null)];
+        if ($text === '' || $text === '-') {
+            return [null, null];
+        }
+
+        $comma = strpos($text, ',');
+
+        if ($comma === false) {
+            return preg_match(self::SIZE_RE, $text)
+                ? [null, self::clean($text)]
+                : [self::clean($text), null];
+        }
+
+        return [self::clean(substr($text, 0, $comma)), self::clean(substr($text, $comma + 1))];
+    }
+
+    /**
+     * trim() yang juga membuang spasi tak terputus (NBSP) dan spasi Unicode lain,
+     * sama seperti String.prototype.trim di JavaScript. Data dari Excel sering menyelipkannya.
+     */
+    private static function trimAll(?string $value): string
+    {
+        return (string) preg_replace(
+            '~^[\s\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]+|[\s\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]+$~u',
+            '',
+            (string) $value
+        );
     }
 
     public static function clean(?string $value): ?string
     {
-        $value = trim((string) $value);
+        $value = self::trimAll($value);
 
         return ($value === '' || $value === '-') ? null : $value;
     }

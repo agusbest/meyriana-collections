@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import client from "../api/client";
-import { readShopeeFile, buildAutoRecipe, guessCategory } from "../utils/shopeeImport";
+import { readShopeeFile, buildAutoRecipe, guessCategory, parseVariation } from "../utils/shopeeImport";
 
 const STEPS = ["Upload file", "Barang gudang", "Isi paket", "Simpan"];
 
@@ -23,7 +23,11 @@ const GROUPS_PER_PAGE = 20;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase();
 const uid = (prefix) => prefix + Math.random().toString(36).slice(2, 10);
-const draftKey = (marketplaceId) => `simpro-impor-shopee-${marketplaceId}`;
+const draftKey = (marketplaceId) => `simpro-impor-v2-${marketplaceId}`;
+
+function variantLabel(v) {
+  return [v.color, v.size].filter(Boolean).join(" / ") || "tanpa warna/ukuran";
+}
 
 // Gaya dasar TANPA lebar: lebar ditentukan di tiap pemakaian (w-full, w-20, w-auto, ...)
 const fieldBase =
@@ -62,9 +66,10 @@ export function buildModel(listings, products) {
   }
 
   const groupMap = new Map();
+  const distinctKeys = new Map(); // id kelompok -> kumpulan warna/ukuran berbeda
 
   for (const listing of listings) {
-    const recipe = buildAutoRecipe(listing.product_name, listing.marketplace_sku);
+    const recipe = buildAutoRecipe(listing.product_name, listing.marketplace_sku, listing.variation_name);
     const lines = recipe.items.map((it) => ({ id: uid("l"), itemId: ensureItem(it.name), qty: it.qty }));
     const signature = `${listing.external_product_id}|${lines.map((l) => `${l.itemId}:${l.qty}`).join(",")}`;
 
@@ -76,6 +81,8 @@ export function buildModel(listings, products) {
         productName: listing.product_name,
         listingIds: [],
         variations: [],
+        variants: [],
+        distinct: 0,
         skus: [],
         lines,
         notes: [],
@@ -87,6 +94,15 @@ export function buildModel(listings, products) {
 
     group.listingIds.push(listing.id);
     group.variations.push(listing.variation_name || "Tanpa variasi");
+
+    const parsed = parseVariation(listing.variation_name);
+    const keys = distinctKeys.get(group.id) ?? new Set();
+    keys.add(`${parsed.color ?? ""}|${parsed.size ?? ""}`.toLowerCase());
+    distinctKeys.set(group.id, keys);
+
+    if (group.variants.length < 6) {
+      group.variants.push({ name: listing.variation_name || "Tanpa variasi", color: parsed.color, size: parsed.size });
+    }
     if (listing.marketplace_sku && group.skus.length < 3) group.skus.push(listing.marketplace_sku);
 
     for (const note of recipe.notes) {
@@ -95,6 +111,8 @@ export function buildModel(listings, products) {
   }
 
   const groups = [...groupMap.values()].sort((a, b) => a.productName.localeCompare(b.productName, "id"));
+
+  for (const group of groups) group.distinct = distinctKeys.get(group.id)?.size ?? 0;
 
   return { items, groups };
 }
@@ -889,7 +907,7 @@ export default function ImportShopee() {
               <p className="text-on-surface-variant">
                 Isi 1 paket = barang apa saja yang keluar dari gudang setiap 1 pesanan. Contoh "3 SETEL KUTUNG"
                 isinya Baju Kutung ×3 + Celana Pop ×3, jadi tiap 1 pesanan stok baju dan celana masing-masing
-                berkurang 3. Warna dan ukuran mengikuti variasi di {mpName} otomatis.
+                berkurang 3. Warna dan ukuran dibaca dari nama variasi di {mpName}; tulisan jumlah paket seperti "3 PCS" tidak dianggap warna.
               </p>
             </div>
 
@@ -943,6 +961,28 @@ export default function ImportShopee() {
                       {g.variations.length > 4 ? `, +${g.variations.length - 4} lagi` : ""}
                       {g.skus[0] ? ` • SKU: ${g.skus[0]}` : ""}
                     </p>
+                    {!g.skipped && g.variants?.length > 0 && (
+                      <div className="mt-2 rounded-lg bg-surface-container-low/60 px-3 py-2 text-xs space-y-0.5">
+                        <span className="block font-semibold text-on-surface-variant">
+                          Warna/ukuran barang yang akan dibuat:
+                        </span>
+                        {g.variants.slice(0, 4).map((v) => (
+                          <div key={v.name}>
+                            <span className="text-on-surface-variant">{v.name}</span>
+                            <span className="text-outline"> → </span>
+                            <b className="text-on-surface">{variantLabel(v)}</b>
+                          </div>
+                        ))}
+                        {g.listingIds.length > 4 && (
+                          <div className="text-outline">+{g.listingIds.length - 4} variasi lainnya dengan pola serupa</div>
+                        )}
+                        {g.listingIds.length > 1 && g.distinct === 1 && (
+                          <div className="text-emerald-700">
+                            Semua variasi ini memakai satu stok yang sama, hanya jumlah per paketnya yang berbeda.
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {g.notes.length > 0 && !g.reviewed && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
                         {g.notes.map((n) => (

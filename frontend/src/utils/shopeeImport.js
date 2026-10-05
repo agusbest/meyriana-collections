@@ -115,9 +115,34 @@ export async function readShopeeFile(file) {
   return parseShopeeRows(rows);
 }
 
+// Awalan jumlah paket di nama variasi: "3 PCS", "2 Setel", "18 PCS - KMB 01", "12 PCS COKLAT,M"
+const PACK_RE = /^\s*(\d{1,3})\s*(pcs|pc|setelan|setel|stel|set|pasang|psg|lusin|potong|ptg)\b[\s\-–—\/:.,]*/i;
+
+// Nama ukuran murni: "M", "XL", "NB", "0-3 BULAN", "6-12", "3 Bulan"
+const SIZE_RE =
+  /^(nb|new\s*born|xxs|xs|s|m|l|xl|xxl|xxxl|\d{1,2}\s*-\s*\d{1,2}(\s*(bln|bulan|m|th|tahun))?|\d{1,2}\s*(bln|bulan|th|tahun))$/i;
+
+/**
+ * Jumlah paket dari nama variasi. "3 PCS" -> { n: 3, unit: "pcs" }; tanpa pola paket -> null.
+ */
+export function readPack(name) {
+  const m = String(name ?? "").match(PACK_RE);
+  if (!m) return null;
+
+  const n = Number(m[1]);
+  const unit = m[2].toLowerCase();
+
+  return n >= 1 ? { n: unit === "lusin" ? n * 12 : n, unit } : null;
+}
+
 /**
  * Sama persis dengan ListingMappingService::parseVariation di backend.
- * "Coklat Rainbow,XL" -> { color: "Coklat Rainbow", size: "XL" }
+ *   "Coklat Rainbow,XL"   -> warna "Coklat Rainbow", ukuran "XL"
+ *   "Autumn"              -> warna "Autumn"
+ *   "3 PCS" / "18 Pcs"    -> tanpa warna & ukuran (itu ukuran paket, bukan warna)
+ *   "18 PCS - KMB 01"     -> warna "KMB 01"
+ *   "3 Setelan Panjang"   -> warna "Panjang"
+ *   "XL" / "0-3 BULAN"    -> ukuran saja
  */
 export function parseVariation(name) {
   const clean = (v) => {
@@ -125,13 +150,21 @@ export function parseVariation(name) {
     return t === "" || t === "-" ? null : t;
   };
 
-  const text = String(name ?? "").trim();
+  let text = String(name ?? "").trim();
+
+  if (text === "" || text === "-") return { color: null, size: null };
+
+  const pack = text.match(PACK_RE);
+
+  if (pack) text = text.slice(pack[0].length).trim();
 
   if (text === "" || text === "-") return { color: null, size: null };
 
   const comma = text.indexOf(",");
 
-  if (comma === -1) return { color: clean(text), size: null };
+  if (comma === -1) {
+    return SIZE_RE.test(text) ? { color: null, size: clean(text) } : { color: clean(text), size: null };
+  }
 
   return { color: clean(text.slice(0, comma)), size: clean(text.slice(comma + 1)) };
 }
@@ -202,7 +235,7 @@ function readCount(text) {
  * Tebakan isi 1 kali penjualan listing, per potong.
  * Mengembalikan { items: [{ name, qty }], notes: [alasan perlu dicek] }
  */
-export function buildAutoRecipe(productName, sku) {
+export function buildAutoRecipe(productName, sku, variationName = "") {
   const notes = [];
   let names = suggestComponentNames(productName);
 
@@ -228,8 +261,8 @@ export function buildAutoRecipe(productName, sku) {
     }
   }
 
-  // Jumlah: dari angka di depan SKU, kalau tidak ada dari judul
-  let count = readCount(sku);
+  // Jumlah: dari nama variasi ("3 PCS") dulu karena paling spesifik, lalu angka di depan SKU, lalu judul
+  let count = readPack(variationName) ?? readCount(sku);
   if (!count) {
     const m = String(productName ?? "").match(/\b(\d{1,3})\s*(pcs|pc|setel|setelan|stel|set|pasang|psg|lusin)\b/i);
     if (m) {

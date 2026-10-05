@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import client from "../api/client";
 import Modal from "./Modal";
 import {
+  readPack,
   parseVariation,
   suggestComponentNames,
   suggestQty,
@@ -386,6 +387,14 @@ export default function ListingMappingModal({ open, group, onClose, onSaved }) {
             ))}
           </div>
         </div>
+
+        {new Set(selectedListings.map((l) => readPack(l.variation_name)?.n ?? 0)).size > 1 && (
+          <p className="px-3 py-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-xs">
+            Variasi yang dicentang punya ukuran paket berbeda (misal 3 PCS dan 6 PCS), padahal jumlah di bawah
+            berlaku untuk semuanya. Simpan per ukuran paket supaya jumlahnya benar, atau pakai Impor Produk yang
+            memisahkannya otomatis.
+          </p>
+        )}
 
         {/* 2. Resep */}
         <div>
