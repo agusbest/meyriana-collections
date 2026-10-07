@@ -22,9 +22,9 @@ class ListingMappingService
      *     variant_mode "fixed":  warna/ukuran tetap sesuai isian (color, size)
      * Varian lokal yang belum ada dibuat otomatis (stok 0, HPP 0 -> isi nanti di menu Produk).
      */
-    public function apply(array $listingIds, array $lines, string $source = 'manual'): Collection
+    public function apply(array $listingIds, array $lines, string $source = 'manual', array $overrides = []): Collection
     {
-        return DB::transaction(function () use ($listingIds, $lines, $source) {
+        return DB::transaction(function () use ($listingIds, $lines, $source, $overrides) {
             $listings = MarketplaceListing::whereIn('id', $listingIds)->get();
 
             // 1. Produk lokal per baris resep (pakai yang ada, atau buat baru dengan nama pendek)
@@ -38,14 +38,20 @@ class ListingMappingService
 
             // 2. Untuk tiap listing: tentukan varian per baris, lalu ganti komponennya
             foreach ($listings as $listing) {
-                [$followColor, $followSize] = self::parseVariation($listing->variation_name);
+                [$followColor, $followSize] = self::resolveVariantAttributes(
+                    $overrides[$listing->id] ?? null,
+                    $listing->variation_name,
+                    $listing->product_name,
+                );
 
                 $components = [];
 
                 foreach ($lines as $i => $line) {
                     $follow = ($line['variant_mode'] ?? 'follow') === 'follow';
 
-                    $color = $follow ? $followColor : self::clean($line['color'] ?? null);
+                    $color = $follow
+                        ? self::colorForItem($products[$i]->name, $followColor)
+                        : self::clean($line['color'] ?? null);
                     $size = $follow ? $followSize : self::clean($line['size'] ?? null);
 
                     $variant = $this->findOrCreateVariant($products[$i], $color, $size);
@@ -142,7 +148,17 @@ class ListingMappingService
                     'variant_mode' => 'follow',
                 ], $job['lines']);
 
-                $this->apply($ids, $lines, ! empty($job['reviewed']) ? 'manual' : 'auto');
+                // Warna/ukuran per variasi yang sudah dicek/diubah pengguna di wizard
+                $overrides = [];
+
+                foreach ($job['variants'] ?? [] as $variant) {
+                    $overrides[(int) $variant['listing_id']] = [
+                        'color' => $variant['color'] ?? null,
+                        'size' => $variant['size'] ?? null,
+                    ];
+                }
+
+                $this->apply($ids, $lines, ! empty($job['reviewed']) ? 'manual' : 'auto', $overrides);
 
                 $mapped += count($ids);
             }
@@ -166,6 +182,25 @@ class ListingMappingService
 
             return $deleted;
         });
+    }
+
+    /**
+     * Warna & ukuran satu variasi marketplace.
+     * Kalau pengguna sudah mengisinya di wizard ($override ada), isian itu dipakai apa adanya,
+     * termasuk kosong (= sengaja tanpa warna/ukuran). Kalau tidak, dibaca dari nama variasi, dan ukuran
+     * yang masih kosong dilengkapi dari usia di judul produk.
+     *
+     * @return array{0: ?string, 1: ?string} [warna, ukuran]
+     */
+    public static function resolveVariantAttributes(?array $override, ?string $variationName, ?string $title): array
+    {
+        if ($override !== null) {
+            return [self::clean($override['color'] ?? null), self::clean($override['size'] ?? null)];
+        }
+
+        [$color, $size] = self::parseVariation($variationName);
+
+        return [$color, $size ?? self::sizeFromTitle($title)];
     }
 
     // Awalan jumlah paket di nama variasi: "3 PCS", "2 Setel", "18 PCS - KMB 01", "12 PCS COKLAT,M"
@@ -208,6 +243,60 @@ class ListingMappingService
         }
 
         return [self::clean(substr($text, 0, $comma)), self::clean(substr($text, $comma + 1))];
+    }
+
+    // Rentang usia di judul produk: "Usia 3-12 bulan", "0-3 Bulan", "Usia 0-3" (tanpa satuan tapi ada kata "usia")
+    private const TITLE_RANGE_RE = '~(?:\b(usia|umur)\s*)?\b(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*(bulan|bln|bl|tahun|thn|th)?\b~iu';
+
+    // Kata yang hanya cocok untuk atasan; tidak dipakai kalau barangnya celana
+    private const TOP_ONLY_RE = '~\b(singlet|kutung|kutang|oblong|lengan)\b~iu';
+
+    /**
+     * Ukuran (rentang usia) dari judul produk, mis. "Usia 0-3 Bulan" -> "0-3 Bulan".
+     * "Newborn"/"Baru Lahir" tidak dianggap ukuran; rentang tanpa satuan dan tanpa kata "usia" diabaikan;
+     * judul yang menyebut dua rentang berbeda tidak ditebak (null). Sama persis dengan frontend.
+     */
+    public static function sizeFromTitle(?string $title): ?string
+    {
+        if (! preg_match_all(self::TITLE_RANGE_RE, (string) $title, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL)) {
+            return null;
+        }
+
+        $found = [];
+
+        foreach ($matches as $m) {
+            $from = (int) $m[2];
+            $to = (int) $m[3];
+            $unit = strtolower((string) ($m[4] ?? ''));
+
+            if (! ($from < $to)) {
+                continue;
+            }
+
+            if ($unit === '' && empty($m[1])) {
+                continue;
+            }
+
+            $word = in_array($unit, ['tahun', 'thn', 'th'], true) ? 'Tahun' : 'Bulan';
+            $found["{$from}-{$to} {$word}"] = true;
+        }
+
+        return count($found) === 1 ? array_key_first($found) : null;
+    }
+
+    /**
+     * Warna untuk satu barang dalam paket: kata khusus atasan (Singlet, Kutung, Lengan, ...)
+     * dibuang kalau barangnya celana. Sama persis dengan colorForItem di frontend.
+     */
+    public static function colorForItem(string $itemName, ?string $color): ?string
+    {
+        if ($color === null || ! preg_match('~^\s*celana\b~iu', $itemName)) {
+            return $color;
+        }
+
+        $cleaned = self::trimAll((string) preg_replace('~\s+~u', ' ', (string) preg_replace(self::TOP_ONLY_RE, ' ', $color)));
+
+        return ($cleaned === '' || $cleaned === '-') ? null : $cleaned;
     }
 
     /**

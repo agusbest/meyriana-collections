@@ -64,8 +64,15 @@ class SaleService
                 $variant = $variants->get((int) $item['product_variant_id']);
 
                 $qty = (int) $item['qty'];
-                $price = (float) $item['selling_price'];
-                $subtotal = $qty * $price;
+
+                if (isset($item['subtotal'])) {
+                    // Dari impor pesanan: harga paket sudah dibagi per varian, subtotal dipakai apa adanya
+                    $subtotal = round((float) $item['subtotal'], 2);
+                    $price = round($subtotal / max(1, $qty), 2);
+                } else {
+                    $price = (float) $item['selling_price'];
+                    $subtotal = $qty * $price;
+                }
                 $costTotal = $qty * (float) $variant->purchase_price;
 
                 $sale->items()->create([

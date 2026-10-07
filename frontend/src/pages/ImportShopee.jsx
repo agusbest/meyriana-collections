@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import client from "../api/client";
-import { readShopeeFile, buildAutoRecipe, guessCategory, parseVariation } from "../utils/shopeeImport";
+import {
+  readShopeeFile,
+  buildAutoRecipe,
+  guessCategory,
+  listingVariant,
+  colorForItem,
+  colorFromSku,
+} from "../utils/shopeeImport";
 
 const STEPS = ["Upload file", "Barang gudang", "Isi paket", "Simpan"];
 
@@ -23,7 +30,7 @@ const GROUPS_PER_PAGE = 20;
 
 const norm = (s) => String(s ?? "").trim().toLowerCase();
 const uid = (prefix) => prefix + Math.random().toString(36).slice(2, 10);
-const draftKey = (marketplaceId) => `simpro-impor-v2-${marketplaceId}`;
+const draftKey = (marketplaceId) => `simpro-impor-v4-${marketplaceId}`;
 
 function variantLabel(v) {
   return [v.color, v.size].filter(Boolean).join(" / ") || "tanpa warna/ukuran";
@@ -66,7 +73,6 @@ export function buildModel(listings, products) {
   }
 
   const groupMap = new Map();
-  const distinctKeys = new Map(); // id kelompok -> kumpulan warna/ukuran berbeda
 
   for (const listing of listings) {
     const recipe = buildAutoRecipe(listing.product_name, listing.marketplace_sku, listing.variation_name);
@@ -82,7 +88,6 @@ export function buildModel(listings, products) {
         listingIds: [],
         variations: [],
         variants: [],
-        distinct: 0,
         skus: [],
         lines,
         notes: [],
@@ -95,14 +100,20 @@ export function buildModel(listings, products) {
     group.listingIds.push(listing.id);
     group.variations.push(listing.variation_name || "Tanpa variasi");
 
-    const parsed = parseVariation(listing.variation_name);
-    const keys = distinctKeys.get(group.id) ?? new Set();
-    keys.add(`${parsed.color ?? ""}|${parsed.size ?? ""}`.toLowerCase());
-    distinctKeys.set(group.id, keys);
+    const parsed = listingVariant(listing.variation_name, listing.product_name);
+    const variationText = String(listing.variation_name ?? "").trim();
 
-    if (group.variants.length < 6) {
-      group.variants.push({ name: listing.variation_name || "Tanpa variasi", color: parsed.color, size: parsed.size });
-    }
+    // Warna/ukuran per variasi: hasil tebakan, bisa diubah pengguna sebelum disimpan
+    group.variants.push({
+      id: listing.id,
+      name: variationText || "Tanpa variasi",
+      sku: listing.marketplace_sku ?? "",
+      color: parsed.color,
+      size: parsed.size,
+      skuColor: parsed.color ? null : colorFromSku(listing.marketplace_sku),
+      hasVariation: variationText !== "" && variationText !== "-",
+      edited: false,
+    });
     if (listing.marketplace_sku && group.skus.length < 3) group.skus.push(listing.marketplace_sku);
 
     for (const note of recipe.notes) {
@@ -112,7 +123,10 @@ export function buildModel(listings, products) {
 
   const groups = [...groupMap.values()].sort((a, b) => a.productName.localeCompare(b.productName, "id"));
 
-  for (const group of groups) group.distinct = distinctKeys.get(group.id)?.size ?? 0;
+  // Variasi tanpa warna ikut masuk daftar "Perlu dicek"
+  for (const group of groups) {
+    if (group.variants.some((v) => v.hasVariation && !v.color)) group.notes.push("ada variasi tanpa warna");
+  }
 
   return { items, groups };
 }
@@ -142,10 +156,223 @@ export function buildPayload(usedItems, activeGroups) {
   const jobs = activeGroups.map((g) => ({
     listing_ids: g.listingIds,
     reviewed: g.reviewed || !g.notes.length,
+    // dipakai backend apa adanya (termasuk kosong yang disengaja)
+    variants: (g.variants ?? []).map((v) => ({
+      listing_id: v.id,
+      color: String(v.color ?? "").trim() || null,
+      size: String(v.size ?? "").trim() || null,
+    })),
     lines: g.lines.map((l) => ({ item: norm(itemById.get(l.itemId)?.name), qty: Number(l.qty) })),
   }));
 
   return { merged, jobs };
+}
+
+// Nilai yang paling sering dipakai, untuk saran isian (mencegah "Autum" vs "Autumn" jadi dua warna)
+function topValues(values, limit = 150) {
+  const counts = new Map();
+
+  for (const raw of values) {
+    const v = String(raw ?? "").trim();
+    if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([v]) => v);
+}
+
+// Tabel isian warna & ukuran per variasi, dengan pengisian massal
+function VariantEditor({ group, onChange, onApplyAll, onFillFromSku }) {
+  const [bulk, setBulk] = useState({ color: "", size: "" });
+  const withSuggestion = group.variants.filter((v) => !v.color && v.skuColor).length;
+  const canApply = bulk.color.trim() !== "" || bulk.size.trim() !== "";
+
+  return (
+    <div className="mt-2 space-y-2 text-sm">
+      <div className="flex flex-wrap items-end gap-2 p-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest">
+        <label className="block">
+          <span className="block text-[11px] text-outline mb-0.5">Warna untuk semua variasi</span>
+          <input
+            list="warna-umum"
+            value={bulk.color}
+            onChange={(e) => setBulk((b) => ({ ...b, color: e.target.value }))}
+            placeholder="mis. Autumn"
+            maxLength={100}
+            className={`${fieldBase} w-40`}
+          />
+        </label>
+        <label className="block">
+          <span className="block text-[11px] text-outline mb-0.5">Ukuran untuk semua variasi</span>
+          <input
+            list="ukuran-umum"
+            value={bulk.size}
+            onChange={(e) => setBulk((b) => ({ ...b, size: e.target.value }))}
+            placeholder="mis. 0-3 Bulan"
+            maxLength={100}
+            className={`${fieldBase} w-40`}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!canApply}
+          onClick={() =>
+            onApplyAll({
+              ...(bulk.color.trim() ? { color: bulk.color.trim() } : {}),
+              ...(bulk.size.trim() ? { size: bulk.size.trim() } : {}),
+            })
+          }
+          className="px-3 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/5 disabled:opacity-40"
+        >
+          Terapkan ke semua
+        </button>
+        {withSuggestion > 0 && (
+          <button
+            type="button"
+            onClick={onFillFromSku}
+            title="Warna diambil dari SKU penjual. Ini tebakan, jadi periksa hasilnya."
+            className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface hover:bg-surface-container-low"
+          >
+            Isi yang kosong dari SKU ({withSuggestion})
+          </button>
+        )}
+      </div>
+
+      <div className="max-h-72 overflow-y-auto custom-scroll rounded-lg border border-outline-variant">
+        <table className="w-full min-w-[520px] text-left text-xs">
+          <thead className="bg-surface-container-low text-outline uppercase tracking-wider sticky top-0">
+            <tr>
+              <th className="py-2 px-2">Variasi di marketplace</th>
+              <th className="py-2 px-2">Warna</th>
+              <th className="py-2 px-2">Ukuran</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-container-high bg-surface-container-lowest">
+            {group.variants.map((v) => (
+              <tr key={v.id}>
+                <td className="py-1.5 px-2 align-top text-on-surface-variant">
+                  {v.name}
+                  {v.sku && <span className="block text-[11px] text-outline">SKU: {v.sku}</span>}
+                </td>
+                <td className="py-1.5 px-2 align-top">
+                  <input
+                    list="warna-umum"
+                    aria-label={`Warna untuk ${v.name}`}
+                    value={v.color ?? ""}
+                    onChange={(e) => onChange(v.id, { color: e.target.value })}
+                    placeholder="tanpa warna"
+                    maxLength={100}
+                    className={`${fieldBase} w-full ${v.edited ? "border-emerald-400" : ""}`}
+                  />
+                  {!v.color && v.skuColor && (
+                    <button
+                      type="button"
+                      onClick={() => onChange(v.id, { color: v.skuColor })}
+                      className="mt-0.5 text-[11px] text-primary hover:underline"
+                    >
+                      Saran dari SKU: {v.skuColor}
+                    </button>
+                  )}
+                </td>
+                <td className="py-1.5 px-2 align-top">
+                  <input
+                    list="ukuran-umum"
+                    aria-label={`Ukuran untuk ${v.name}`}
+                    value={v.size ?? ""}
+                    onChange={(e) => onChange(v.id, { size: e.target.value })}
+                    placeholder="tanpa ukuran"
+                    maxLength={100}
+                    className={`${fieldBase} w-full ${v.edited ? "border-emerald-400" : ""}`}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] text-outline">
+        Kosongkan kalau barangnya memang tidak punya warna/ukuran. Warna dan ukuran yang sama dihitung satu stok,
+        jadi samakan penulisannya (mis. "Autumn", bukan "Autum").
+      </p>
+    </div>
+  );
+}
+
+// Pratinjau warna/ukuran per kartu + tombol untuk mengubahnya
+function VariantPanel({ g, itemById, open, onToggle, onChange, onApplyAll, onFillFromSku }) {
+  const distinct = new Set(g.variants.map((v) => `${norm(v.color)}|${norm(v.size)}`)).size;
+  const emptyCount = g.variants.filter((v) => v.hasVariation && !v.color).length;
+
+  return (
+    <div className="mt-2 rounded-lg bg-surface-container-low/60 px-3 py-2 text-xs space-y-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-semibold text-on-surface-variant">
+          Warna/ukuran barang yang akan dibuat (ukuran dari nama variasi, atau usia di judul):
+        </span>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/5"
+        >
+          <span className="material-symbols-outlined text-[16px]">{open ? "expand_less" : "edit"}</span>
+          {open ? "Tutup" : "Ubah warna/ukuran"}
+        </button>
+      </div>
+
+      {!open && (
+        <>
+          {g.variants.slice(0, 4).map((v) => {
+            // label per barang: "Singlet" tidak dipasang ke celana, jadi bisa berbeda antar barang
+            const perItem = g.lines.map((l) => {
+              const name = itemById.get(l.itemId)?.name ?? "";
+              return { name, label: variantLabel({ color: colorForItem(name, v.color), size: v.size }) };
+            });
+            const same = perItem.every((p) => p.label === perItem[0]?.label);
+
+            return (
+              <div key={v.id}>
+                <span className="text-on-surface-variant">{v.name}</span>
+                <span className="text-outline"> → </span>
+                {same ? (
+                  <b className="text-on-surface">{variantLabel(v)}</b>
+                ) : (
+                  perItem.map((p, i) => (
+                    <span key={`${p.name}-${i}`}>
+                      {i > 0 && <span className="text-outline"> • </span>}
+                      <span className="text-on-surface-variant">{p.name || "Barang"}:</span>{" "}
+                      <b className="text-on-surface">{p.label}</b>
+                    </span>
+                  ))
+                )}
+                {v.edited && <span className="ml-1 text-[10px] text-emerald-700">(diubah)</span>}
+              </div>
+            );
+          })}
+
+          {g.variants.length > 4 && (
+            <div className="text-outline">+{g.variants.length - 4} variasi lainnya dengan pola serupa</div>
+          )}
+
+          {emptyCount > 0 && (
+            <div className="text-amber-700">
+              {emptyCount} variasi belum punya warna. Klik "Ubah warna/ukuran" kalau perlu diisi.
+            </div>
+          )}
+
+          {g.variants.length > 1 && distinct === 1 && (
+            <div className="text-emerald-700">
+              Semua variasi ini memakai satu stok yang sama, hanya jumlah per paketnya yang berbeda.
+            </div>
+          )}
+        </>
+      )}
+
+      {open && <VariantEditor group={g} onChange={onChange} onApplyAll={onApplyAll} onFillFromSku={onFillFromSku} />}
+    </div>
+  );
 }
 
 function Stepper({ step }) {
@@ -227,6 +454,10 @@ export default function ImportShopee() {
 
   const [itemFilter, setItemFilter] = useState({ text: "", type: "all", page: 1 });
   const [groupFilter, setGroupFilter] = useState({ type: "check", page: 1 });
+  // Kartu yang ditampilkan di tab "Perlu dicek". Ditetapkan saat tab dibuka, supaya kartu yang baru
+  // ditandai tetap terlihat (dengan tanda hijau) dan tidak langsung menghilang.
+  const [checkIds, setCheckIds] = useState(() => new Set());
+  const [openEditors, setOpenEditors] = useState(() => new Set()); // kartu yang tabel warna/ukurannya terbuka
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -321,10 +552,20 @@ export default function ImportShopee() {
     return map;
   }, [usedItems]);
 
+  const commonColors = useMemo(() => topValues(groups.flatMap((g) => g.variants ?? []).map((v) => v.color)), [groups]);
+  const commonSizes = useMemo(() => topValues(groups.flatMap((g) => g.variants ?? []).map((v) => v.size)), [groups]);
+
   const missingSupplier = usedItems.filter((it) => !it.supplierId).length;
   const missingHpp = usedItems.filter((it) => it.hpp === "").length;
   const activeGroups = groups.filter((g) => !g.skipped);
-  const checkGroups = groups.filter((g) => !g.skipped && g.notes.length && !g.reviewed);
+  const needsCheck = (g) => !g.skipped && g.notes.length > 0 && !g.reviewed;
+  const checkGroups = groups.filter(needsCheck);
+  const checkTotal = groups.filter((g) => !g.skipped && g.notes.length > 0).length;
+  const checkDone = checkTotal - checkGroups.length;
+
+  function refreshCheckList() {
+    setCheckIds(new Set(groups.filter(needsCheck).map((g) => g.id)));
+  }
 
   // ---------- langkah 1 ----------
   async function handleFile(e) {
@@ -448,6 +689,7 @@ export default function ImportShopee() {
     }
 
     setError("");
+    refreshCheckList();
     setGroupFilter({ type: checkGroups.length ? "check" : "all", page: 1 });
     setStep(3);
   }
@@ -464,6 +706,50 @@ export default function ImportShopee() {
           : g,
       ),
     );
+
+  // Warna/ukuran per variasi. Mengubahnya juga otomatis menandai kartu sebagai sudah dicek.
+  const updateVariant = (groupId, listingId, patch) =>
+    setGroups((current) =>
+      current.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              reviewed: true,
+              variants: g.variants.map((v) => (v.id === listingId ? { ...v, ...patch, edited: true } : v)),
+            }
+          : g,
+      ),
+    );
+
+  const applyToAllVariants = (groupId, patch) =>
+    setGroups((current) =>
+      current.map((g) =>
+        g.id === groupId
+          ? { ...g, reviewed: true, variants: g.variants.map((v) => ({ ...v, ...patch, edited: true })) }
+          : g,
+      ),
+    );
+
+  const fillEmptyColorsFromSku = (groupId) =>
+    setGroups((current) =>
+      current.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              reviewed: true,
+              variants: g.variants.map((v) => (!v.color && v.skuColor ? { ...v, color: v.skuColor, edited: true } : v)),
+            }
+          : g,
+      ),
+    );
+
+  function toggleEditor(id) {
+    setOpenEditors((current) => {
+      const next = new Set(current);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   // Nama barang diketik: cocokkan ke barang yang ada; kalau tidak ada, buat barang baru saat kolom ditinggalkan
   function commitLineName(groupId, line) {
@@ -497,7 +783,7 @@ export default function ImportShopee() {
   }
 
   const filteredGroups = groups.filter((g) => {
-    if (groupFilter.type === "check") return !g.skipped && g.notes.length && !g.reviewed;
+    if (groupFilter.type === "check") return checkIds.size ? checkIds.has(g.id) : needsCheck(g);
     if (groupFilter.type === "skipped") return g.skipped;
     return true;
   });
@@ -908,8 +1194,46 @@ export default function ImportShopee() {
                 Isi 1 paket = barang apa saja yang keluar dari gudang setiap 1 pesanan. Contoh "3 SETEL KUTUNG"
                 isinya Baju Kutung ×3 + Celana Pop ×3, jadi tiap 1 pesanan stok baju dan celana masing-masing
                 berkurang 3. Warna dan ukuran dibaca dari nama variasi di {mpName}; tulisan jumlah paket seperti "3 PCS" tidak dianggap warna.
+                Kalau warnanya belum sesuai, klik <b>Ubah warna/ukuran</b> di kartunya dan isi sendiri sebelum disimpan.
+              </p>
+              <p className="text-on-surface-variant mt-1.5">
+                Kalau isi paket sudah sesuai, klik <b>Tandai sudah benar</b>. Produk yang sudah ditandai tidak diberi
+                label "perlu dicek" lagi setelah disimpan. Mengubah isinya juga otomatis menandainya.
               </p>
             </div>
+
+            {checkTotal > 0 && (
+              <div className="p-3 rounded-lg bg-surface-container-low">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-1.5">
+                  <span className="font-medium text-on-surface">
+                    Sudah dicek {formatNumber(checkDone)} dari {formatNumber(checkTotal)} produk yang perlu dicek
+                  </span>
+                  {checkDone >= checkTotal ? (
+                    <span className="text-emerald-700 font-semibold">Semua sudah dicek, klik Lanjut</span>
+                  ) : (
+                    <span className="text-outline">sisa {formatNumber(checkTotal - checkDone)}</span>
+                  )}
+                </div>
+                <div className="h-2 rounded-full bg-surface-container overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all"
+                    style={{ width: `${Math.round((checkDone / checkTotal) * 100)}%` }}
+                  />
+                </div>
+                {groupFilter.type === "check" && checkDone > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      refreshCheckList();
+                      setGroupFilter((f) => ({ ...f, page: 1 }));
+                    }}
+                    className="mt-2 text-xs text-primary hover:underline"
+                  >
+                    Sembunyikan yang sudah dicek
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               {[
@@ -920,7 +1244,10 @@ export default function ImportShopee() {
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setGroupFilter({ type, page: 1 })}
+                  onClick={() => {
+                    if (type === "check") refreshCheckList();
+                    setGroupFilter({ type, page: 1 });
+                  }}
                   className={`px-3 py-1.5 rounded-full border text-sm ${
                     groupFilter.type === type
                       ? "border-primary bg-primary text-on-primary"
@@ -937,6 +1264,16 @@ export default function ImportShopee() {
                 <option key={it.id} value={it.name} />
               ))}
             </datalist>
+            <datalist id="warna-umum">
+              {commonColors.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+            <datalist id="ukuran-umum">
+              {commonSizes.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
 
             {pagedGroups.length === 0 && (
               <div className="py-8 text-center text-outline rounded-xl border border-dashed border-outline-variant">
@@ -951,37 +1288,44 @@ export default function ImportShopee() {
                 <div
                   key={g.id}
                   className={`rounded-xl border p-3.5 space-y-3 ${
-                    g.skipped ? "border-outline-variant opacity-60" : g.reviewed ? "border-emerald-300" : "border-outline-variant"
+                    g.skipped
+                      ? "border-outline-variant opacity-60"
+                      : g.reviewed
+                        ? "border-emerald-400 bg-emerald-50/40"
+                        : "border-outline-variant"
                   }`}
                 >
                   <div>
-                    <p className="font-medium text-on-surface leading-snug line-clamp-2">{g.productName}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-on-surface leading-snug line-clamp-2">{g.productName}</p>
+                      {!g.skipped && g.notes.length > 0 && (
+                        g.reviewed ? (
+                          <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-600 text-white">
+                            <span className="material-symbols-outlined text-[14px]">check</span>
+                            Sudah dicek
+                          </span>
+                        ) : (
+                          <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                            Perlu dicek
+                          </span>
+                        )
+                      )}
+                    </div>
                     <p className="text-xs text-outline mt-0.5">
                       {g.variations.length} variasi: {g.variations.slice(0, 4).join(", ")}
                       {g.variations.length > 4 ? `, +${g.variations.length - 4} lagi` : ""}
                       {g.skus[0] ? ` • SKU: ${g.skus[0]}` : ""}
                     </p>
                     {!g.skipped && g.variants?.length > 0 && (
-                      <div className="mt-2 rounded-lg bg-surface-container-low/60 px-3 py-2 text-xs space-y-0.5">
-                        <span className="block font-semibold text-on-surface-variant">
-                          Warna/ukuran barang yang akan dibuat:
-                        </span>
-                        {g.variants.slice(0, 4).map((v) => (
-                          <div key={v.name}>
-                            <span className="text-on-surface-variant">{v.name}</span>
-                            <span className="text-outline"> → </span>
-                            <b className="text-on-surface">{variantLabel(v)}</b>
-                          </div>
-                        ))}
-                        {g.listingIds.length > 4 && (
-                          <div className="text-outline">+{g.listingIds.length - 4} variasi lainnya dengan pola serupa</div>
-                        )}
-                        {g.listingIds.length > 1 && g.distinct === 1 && (
-                          <div className="text-emerald-700">
-                            Semua variasi ini memakai satu stok yang sama, hanya jumlah per paketnya yang berbeda.
-                          </div>
-                        )}
-                      </div>
+                      <VariantPanel
+                        g={g}
+                        itemById={itemById}
+                        open={openEditors.has(g.id)}
+                        onToggle={() => toggleEditor(g.id)}
+                        onChange={(listingId, patch) => updateVariant(g.id, listingId, patch)}
+                        onApplyAll={(patch) => applyToAllVariants(g.id, patch)}
+                        onFillFromSku={() => fillEmptyColorsFromSku(g.id)}
+                      />
                     )}
                     {g.notes.length > 0 && !g.reviewed && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -1074,10 +1418,12 @@ export default function ImportShopee() {
                       <button
                         type="button"
                         onClick={() => updateGroup(g.id, { reviewed: !g.reviewed })}
-                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-semibold ${
+                        aria-pressed={g.reviewed}
+                        title={g.reviewed ? "Klik lagi untuk membatalkan tanda" : "Klik kalau isi paket di atas sudah sesuai"}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                           g.reviewed
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-300"
-                            : "border border-outline-variant text-on-surface hover:bg-surface-container-low"
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                            : "border border-primary text-primary hover:bg-primary/5"
                         }`}
                       >
                         <span className="material-symbols-outlined text-[18px]">

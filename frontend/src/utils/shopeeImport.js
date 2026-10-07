@@ -169,6 +169,80 @@ export function parseVariation(name) {
   return { color: clean(text.slice(0, comma)), size: clean(text.slice(comma + 1)) };
 }
 
+// Rentang usia di judul produk: "Usia 3-12 bulan", "0-3 Bulan", "Usia 0-3" (tanpa satuan tapi ada kata "usia")
+const TITLE_RANGE_RE = /(?:\b(usia|umur)\s*)?\b(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*(bulan|bln|bl|tahun|thn|th)?\b/gi;
+
+/**
+ * Ukuran (rentang usia) dari judul produk, mis. "Usia 0-3 Bulan" -> "0-3 Bulan".
+ * Kata pemasaran "Newborn" / "Baru Lahir" TIDAK dianggap ukuran. Rentang tanpa satuan dan tanpa kata
+ * "usia" diabaikan (bisa jadi jumlah), dan judul yang menyebut dua rentang berbeda tidak ditebak (null).
+ */
+export function sizeFromTitle(title) {
+  const found = new Set();
+
+  for (const m of String(title ?? "").matchAll(TITLE_RANGE_RE)) {
+    const from = Number(m[2]);
+    const to = Number(m[3]);
+    const unit = (m[4] ?? "").toLowerCase();
+
+    if (!(from < to)) continue;
+    if (!unit && !m[1]) continue;
+
+    found.add(`${from}-${to} ${/^(tahun|thn|th)$/.test(unit) ? "Tahun" : "Bulan"}`);
+  }
+
+  return found.size === 1 ? [...found][0] : null;
+}
+
+/**
+ * Warna/ukuran barang dari satu listing: dari nama variasi; kalau ukurannya kosong,
+ * dipakai usia di judul produk. Sama dengan logika di ListingMappingService (backend).
+ */
+export function listingVariant(variationName, productName) {
+  const v = parseVariation(variationName);
+
+  return { color: v.color, size: v.size ?? sizeFromTitle(productName) };
+}
+
+// Kata yang hanya cocok untuk atasan; tidak dipakai kalau barangnya celana ("Celana Singlet" tidak ada)
+const TOP_ONLY_RE = /\b(singlet|kutung|kutang|oblong|lengan)\b/gi;
+
+export function colorForItem(itemName, color) {
+  if (color === null || color === undefined) return null;
+  if (!/^\s*celana\b/i.test(String(itemName ?? ""))) return color;
+
+  const cleaned = color.replace(TOP_ONLY_RE, " ").replace(/\s+/g, " ").trim();
+
+  return cleaned === "" || cleaned === "-" ? null : cleaned;
+}
+
+// Kata di SKU yang menunjukkan jenis barang / jumlah, bukan warna
+const SKU_STOP = new Set(
+  ("bj baju cl celana setel setelan stel set pcs pc potong ptg pasang psg lusin panjang pendek kutung kutang singlet " +
+    "tutup tertutup buka pop lengan jumper kaos bayi newborn nb sni kaki koko piyama topi bedong sarung tangan gurita " +
+    "popok handuk motif seri warna dan").split(" "),
+);
+
+/**
+ * SARAN warna dari SKU penjual: buang jumlah dan kata jenis barang, sisanya dianggap warna/motif.
+ *   "3 SETEL MOBIL" -> "Mobil", "3 BJ PANJANG PUTIH JUNGLE" -> "Putih Jungle"
+ * Hanya saran: SKU memakai penamaan internal penjual, jadi tidak boleh diisikan otomatis tanpa dicek.
+ */
+export function colorFromSku(sku) {
+  const text = String(sku ?? "").replace(/[()]/g, " ").trim().replace(/^\d{1,3}\s*/, "");
+
+  if (!text) return null;
+
+  const words = text
+    .split(/[\s,\-/_.]+/)
+    .filter(Boolean)
+    .filter((w) => !SKU_STOP.has(w.toLowerCase()) && !/^\d+$/.test(w));
+
+  if (!words.length) return null;
+
+  return words.map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+}
+
 /**
  * Saran nama pendek barang lokal dari judul listing yang panjang.
  * Judul paket "... Baju X dan Celana Y ..." dipecah jadi 2 barang.

@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 const menu = [
   { to: "/", icon: "home", label: "Home" },
-  { to: "/dashboard", icon: "dashboard", label: "Dashboard" },
+  { to: "/dashboard", icon: "dashboard", label: "Dashboard", adminOnly: true },
   {
     key: "master",
     icon: "database",
@@ -26,14 +26,34 @@ const menu = [
     ],
   },
   {
+    key: "Keuangan",
+    icon: "account_balance_wallet",
+    label: "Keuangan",
+    children: [
+      { to: "/expenses", icon: "receipt_long", label: "Biaya Operasional" },
+    ],
+  },
+  {
     key: "setting",
     icon: "settings",
     label: "Setting",
     children: [
       { to: "/settings/fees", icon: "percent", label: "Fee Marketplace" },
+      { to: "/users", icon: "group", label: "Pengguna", adminOnly: true },
     ],
   },
 ];
+
+// Buang menu khusus admin (adminOnly) untuk staf; grup yang jadi kosong ikut hilang
+const menuFor = (isAdmin) =>
+  menu
+    .filter((item) => isAdmin || !item.adminOnly)
+    .map((item) =>
+      item.children
+        ? { ...item, children: item.children.filter((c) => isAdmin || !c.adminOnly) }
+        : item,
+    )
+    .filter((item) => !item.children || item.children.length > 0);
 
 const allLinks = menu.flatMap((m) => (m.children ? m.children : [m]));
 
@@ -51,7 +71,8 @@ const isGroupActive = (group, pathname) =>
   );
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
+  const visibleMenu = menuFor(isAdmin);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -121,9 +142,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
   const handleLogout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
-    await logout();
-    setSidebarOpen(false);
-    navigate("/login", { replace: true });
+    try {
+      await logout();
+    } finally {
+      // Selalu pindah ke Login, apa pun respons server
+      setSidebarOpen(false);
+      navigate("/login", { replace: true });
+    }
   };
 
   const handleMenuClick = (to) => {
@@ -176,7 +201,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           </div>
 
           <nav className="space-y-1.5 flex-1 overflow-y-auto">
-            {menu.map((item) => {
+            {visibleMenu.map((item) => {
               // ===== Item tunggal =====
               if (!item.children) {
                 return (

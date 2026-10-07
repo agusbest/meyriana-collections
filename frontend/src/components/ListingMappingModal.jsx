@@ -3,7 +3,8 @@ import client from "../api/client";
 import Modal from "./Modal";
 import {
   readPack,
-  parseVariation,
+  listingVariant,
+  colorForItem,
   suggestComponentNames,
   suggestQty,
 } from "../utils/shopeeImport";
@@ -54,12 +55,13 @@ function initialLines(group, products) {
   const mapped = group.listings.find((l) => l.components?.length);
 
   if (mapped) {
-    const parsed = parseVariation(mapped.variation_name);
+    const parsed = listingVariant(mapped.variation_name, mapped.product_name);
 
     return mapped.components.map((c) => {
       const v = c.product_variant ?? c.productVariant;
       const follow =
-        norm(v?.color) === norm(parsed.color) && norm(v?.size) === norm(parsed.size);
+        norm(v?.color) === norm(colorForItem(v?.product?.name, parsed.color)) &&
+        norm(v?.size) === norm(parsed.size);
 
       return newLine({
         product_id: String(v?.product_id ?? ""),
@@ -164,10 +166,11 @@ export default function ListingMappingModal({ open, group, onClose, onSaved }) {
   }
 
   function previewFor(listing) {
-    const parsed = parseVariation(listing.variation_name);
+    const parsed = listingVariant(listing.variation_name, listing.product_name);
 
     return lines.map((line) => {
-      const color = line.variant_mode === "follow" ? parsed.color : line.color.trim() || null;
+      const color =
+        line.variant_mode === "follow" ? colorForItem(lineName(line), parsed.color) : line.color.trim() || null;
       const size = line.variant_mode === "follow" ? parsed.size : line.size.trim() || null;
       const product = resolveProduct(line);
       const exists = (product?.variants ?? []).some(

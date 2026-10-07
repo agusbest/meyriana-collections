@@ -22,6 +22,10 @@ class AuthController extends Controller
             return response()->json(['message' => 'Email atau password salah'], 401);
         }
 
+        if (! $user->is_active) {
+            return response()->json(['message' => 'Akun Anda dinonaktifkan. Hubungi admin.'], 403);
+        }
+
         $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
@@ -33,6 +37,7 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
+
         return response()->json(['message' => 'Logged out']);
     }
 

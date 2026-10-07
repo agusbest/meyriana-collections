@@ -240,6 +240,10 @@ class MarketplaceListingController extends Controller
             'jobs.*.listing_ids' => 'required|array|min:1|max:200',
             'jobs.*.listing_ids.*' => 'integer',
             'jobs.*.reviewed' => 'boolean',
+            'jobs.*.variants' => 'nullable|array|max:200',
+            'jobs.*.variants.*.listing_id' => 'required|integer',
+            'jobs.*.variants.*.color' => 'nullable|string|max:100',
+            'jobs.*.variants.*.size' => 'nullable|string|max:100',
             'jobs.*.lines' => 'required|array|min:1|max:10',
             'jobs.*.lines.*.item' => 'required|string|max:255',
             'jobs.*.lines.*.qty' => 'required|integer|min:1|max:1000',
@@ -248,6 +252,8 @@ class MarketplaceListingController extends Controller
             'items.*.supplier_id.required' => 'Ada barang yang belum dipilih suppliernya.',
             'items.*.purchase_price.min' => 'HPP tidak boleh minus.',
             'jobs.*.lines.*.qty.min' => 'Jumlah minimal 1.',
+            'jobs.*.variants.*.color.max' => 'Warna maksimal 100 karakter.',
+            'jobs.*.variants.*.size.max' => 'Ukuran maksimal 100 karakter.',
         ]);
 
         // Cek supplier sekali saja (lebih cepat daripada aturan exists per baris)

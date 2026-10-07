@@ -6,6 +6,7 @@ use App\Models\Marketplace;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sale;
+use App\Models\OperationalExpense;
 use Illuminate\Support\Facades\DB;
 
 class DashboardService
@@ -17,6 +18,8 @@ class DashboardService
 
         $completed = (clone $baseQuery)->where('status', 'completed');
         $pending = (clone $baseQuery)->where('status', 'pending');
+        $expensesApplied = empty($filters['marketplace_id']);
+        $operationalExpenses = $expensesApplied ? $this->operationalExpenses($filters) : 0.0;
 
         return [
             'total_products' => Product::count(),
@@ -24,6 +27,9 @@ class DashboardService
             'total_sales' => (float) $completed->sum('total_sales'),
             'marketplace_fee' => (float) $completed->sum('marketplace_fee'),
             'real_profit' => (float) $completed->sum('profit'),
+            'operational_expenses' => $operationalExpenses,
+            'expenses_applied' => $expensesApplied,
+            'net_profit' => (float) $completed->sum('profit') - $operationalExpenses,
             'pending_transactions' => (clone $pending)->count(),
             'estimated_pending_profit' => (float) $pending->sum('profit'),
             'by_marketplace' => $this->byMarketplace($filters),
@@ -82,5 +88,20 @@ class DashboardService
         if (! empty($filters['marketplace_id'])) {
             $query->where('marketplace_id', $filters['marketplace_id']);
         }
+    }
+
+    private function operationalExpenses(array $filters): float
+    {
+        $query = OperationalExpense::query();
+
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('expense_date', '>=', $filters['date_from']);
+        }
+
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('expense_date', '<=', $filters['date_to']);
+        }
+
+        return (float) $query->sum('amount');
     }
 }

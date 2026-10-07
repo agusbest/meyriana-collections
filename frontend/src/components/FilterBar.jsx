@@ -1,20 +1,22 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 const PRESETS = [
-  { key: 'today', label: 'Hari Ini' },
-  { key: '7days', label: '7 Hari' },
-  { key: 'month', label: 'Bulan Ini' },
-  { key: 'custom', label: 'Custom' },
+  { key: "today", label: "Hari Ini" },
+  { key: "7days", label: "7 Hari" },
+  { key: "month", label: "Bulan Ini" },
+  { key: "custom", label: "Custom" },
 ];
 
 function presetToRange(key) {
   const now = new Date();
-  const fmt = (d) => d.toISOString().slice(0, 10);
+  // const fmt = (d) => d.toISOString().slice(0, 10);
+  const fmt = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-  if (key === 'today') {
+  if (key === "today") {
     return { date_from: fmt(now), date_to: fmt(now) };
   }
-  if (key === '7days') {
+  if (key === "7days") {
     const from = new Date(now);
     from.setDate(from.getDate() - 6);
     return { date_from: fmt(from), date_to: fmt(now) };
@@ -26,13 +28,13 @@ function presetToRange(key) {
 }
 
 export default function FilterBar({ marketplaces = [], onApply }) {
-  const [preset, setPreset] = useState('month');
-  const [range, setRange] = useState(presetToRange('month'));
-  const [marketplaceId, setMarketplaceId] = useState('');
+  const [preset, setPreset] = useState("month");
+  const [range, setRange] = useState(presetToRange("month"));
+  const [marketplaceId, setMarketplaceId] = useState("");
 
   function handlePreset(key) {
     setPreset(key);
-    if (key !== 'custom') {
+    if (key !== "custom") {
       setRange(presetToRange(key));
     }
   }
@@ -57,8 +59,8 @@ export default function FilterBar({ marketplaces = [], onApply }) {
               onClick={() => handlePreset(p.key)}
               className={`px-2.5 py-1 rounded transition-colors ${
                 preset === p.key
-                  ? 'bg-surface-container-lowest text-primary font-semibold shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-surface'
+                  ? "bg-surface-container-lowest text-primary font-semibold shadow-sm"
+                  : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               {p.label}
@@ -67,25 +69,31 @@ export default function FilterBar({ marketplaces = [], onApply }) {
         </div>
 
         {/* Date Range */}
-        {preset === 'custom' ? (
+        {preset === "custom" ? (
           <div className="flex items-center gap-2">
             <input
               type="date"
               value={range.date_from}
-              onChange={(e) => setRange((r) => ({ ...r, date_from: e.target.value }))}
+              onChange={(e) =>
+                setRange((r) => ({ ...r, date_from: e.target.value }))
+              }
               className="px-2 py-1.5 rounded-lg border border-outline-variant text-sm"
             />
             <span className="text-outline text-sm">—</span>
             <input
               type="date"
               value={range.date_to}
-              onChange={(e) => setRange((r) => ({ ...r, date_to: e.target.value }))}
+              onChange={(e) =>
+                setRange((r) => ({ ...r, date_to: e.target.value }))
+              }
               className="px-2 py-1.5 rounded-lg border border-outline-variant text-sm"
             />
           </div>
         ) : (
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant text-sm font-medium font-tnum">
-            <span className="material-symbols-outlined text-[18px] text-outline">calendar_today</span>
+            <span className="material-symbols-outlined text-[18px] text-outline">
+              calendar_today
+            </span>
             {range.date_from} - {range.date_to}
           </div>
         )}
@@ -98,7 +106,9 @@ export default function FilterBar({ marketplaces = [], onApply }) {
         >
           <option value="">Semua Marketplace</option>
           {marketplaces.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}</option>
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
           ))}
         </select>
       </div>
@@ -108,7 +118,9 @@ export default function FilterBar({ marketplaces = [], onApply }) {
         onClick={handleApply}
         className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary text-sm font-semibold transition-all active:scale-[0.98]"
       >
-        <span className="material-symbols-outlined text-[18px]">filter_alt</span>
+        <span className="material-symbols-outlined text-[18px]">
+          filter_alt
+        </span>
         Terapkan Filter
       </button>
     </section>

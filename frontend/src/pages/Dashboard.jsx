@@ -5,8 +5,13 @@ import ProfitChart from "../components/ProfitChart";
 import ChannelPerformance from "../components/ChannelPerformance";
 import FilterBar from "../components/FilterBar";
 
+// function formatRupiah(n) {
+//   return "Rp " + Number(n ?? 0).toLocaleString("id-ID");
+// }
 function formatRupiah(n) {
-  return "Rp " + Number(n ?? 0).toLocaleString("id-ID");
+  const value = Number(n ?? 0);
+
+  return (value < 0 ? "-Rp " : "Rp ") + Math.abs(value).toLocaleString("id-ID");
 }
 
 const STATUS_LABEL = {
@@ -213,7 +218,7 @@ export default function Dashboard() {
       </section>
 
       {/* KPI Cards - Baris 2: Penjualan & profit (ikut filter) */}
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard
           label="Penjualan (Gross)"
           icon="payments"
@@ -237,6 +242,78 @@ export default function Dashboard() {
           badge="Bersih"
           badgeColor="emerald"
           note="Setelah potong HPP & fee"
+          noteIcon="verified"
+        />
+        <KpiCard
+          label="Transaksi Pending"
+          icon="hourglass_top"
+          tone="rose"
+          value={summary.pending_transactions}
+          suffix="menunggu settlement"
+        />
+      </section> */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KpiCard
+          label="Penjualan (Gross)"
+          icon="payments"
+          tone="sky"
+          value={formatRupiah(summary.total_sales)}
+          note="Omzet transaksi completed"
+        />
+        <KpiCard
+          label="Biaya Marketplace"
+          icon="percent"
+          tone="amber"
+          value={formatRupiah(summary.marketplace_fee)}
+          badge="Fee"
+          badgeColor="amber"
+        />
+        <KpiCard
+          label="Profit Penjualan"
+          icon="savings"
+          tone="emerald"
+          value={formatRupiah(summary.real_profit)}
+          note="Setelah potong HPP & fee marketplace"
+          noteIcon="verified"
+        />
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KpiCard
+          label="Biaya Operasional"
+          icon="receipt_long"
+          tone="amber"
+          value={
+            summary.expenses_applied
+              ? formatRupiah(summary.operational_expenses)
+              : "—"
+          }
+          note={
+            summary.expenses_applied
+              ? "Plastik packing, kertas thermal, dll"
+              : "Tidak dibagi per marketplace"
+          }
+        />
+        <KpiCard
+          label="Laba Bersih"
+          icon="account_balance_wallet"
+          tone={summary.net_profit < 0 ? "rose" : "emerald"}
+          value={
+            summary.expenses_applied ? formatRupiah(summary.net_profit) : "—"
+          }
+          badge={
+            summary.expenses_applied
+              ? summary.net_profit < 0
+                ? "Rugi"
+                : "Bersih"
+              : undefined
+          }
+          badgeColor={summary.net_profit < 0 ? "amber" : "emerald"}
+          note={
+            summary.expenses_applied
+              ? "Profit penjualan dikurangi biaya operasional"
+              : "Pilih Semua Marketplace untuk melihat laba bersih"
+          }
           noteIcon="verified"
         />
         <KpiCard

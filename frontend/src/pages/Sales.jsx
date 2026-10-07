@@ -3,6 +3,7 @@ import client from "../api/client";
 import SaleFormModal from "../components/SaleFormModal";
 import SaleDetailModal from "../components/SaleDetailModal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import ImportOrdersModal from "../components/ImportOrdersModal";
 
 function formatRupiah(n) {
   const value = Number(n ?? 0);
@@ -63,6 +64,7 @@ export default function Sales() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
 
   const [busyId, setBusyId] = useState(null);
@@ -145,6 +147,20 @@ export default function Sales() {
     setFormOpen(false);
 
     setToast({ text: `Penjualan ${saved.order_number} berhasil disimpan` });
+
+    if (query.page !== 1) {
+      setQuery((current) => ({ ...current, page: 1 }));
+    } else {
+      reload();
+    }
+  }
+
+  function handleImported({ imported = 0, completed = 0 }) {
+    const parts = [];
+    if (imported) parts.push(`${imported} pesanan diimpor`);
+    if (completed) parts.push(`${completed} pesanan ditandai selesai`);
+
+    setToast({ text: parts.join(", ") });
 
     if (query.page !== 1) {
       setQuery((current) => ({ ...current, page: 1 }));
@@ -271,6 +287,18 @@ export default function Sales() {
 
             <button
               type="button"
+              onClick={() => setImportOpen(true)}
+              title="Impor pesanan dari file marketplace"
+              aria-label="Impor Pesanan"
+              className="shrink-0 inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-3.5 rounded-lg border border-primary text-primary hover:bg-primary/5 text-sm font-semibold transition-all active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[18px]">upload_file</span>
+
+              <span className="hidden sm:inline">Impor</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setFormOpen(true)}
               title="Tambah Penjualan"
               aria-label="Tambah Penjualan"
@@ -324,8 +352,7 @@ export default function Sales() {
 
               {!loading &&
                 sales.map((sale) => {
-                  const status =
-                    STATUS_STYLE[sale.status] ?? STATUS_STYLE.pending;
+                  const status = STATUS_STYLE[sale.status] ?? STATUS_STYLE.pending;
 
                   return (
                     <tr
@@ -337,9 +364,9 @@ export default function Sales() {
                           {sale.order_number}
                         </p>
 
-                        {/* <p className="text-xs text-on-surface-variant">
+                        <p className="text-xs text-on-surface-variant">
                           {sale.items_count ?? 0} item
-                        </p> */}
+                        </p>
                       </td>
 
                       <td className="py-3 px-4 font-tnum text-on-surface-variant">
@@ -476,6 +503,12 @@ export default function Sales() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSaved={handleSaved}
+      />
+
+      <ImportOrdersModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={handleImported}
       />
 
       <SaleDetailModal

@@ -32,16 +32,7 @@ class SaleController extends Controller
             $query->where('status', $request->status);
         }
 
-        // if ($request->filled('marketplace_id')) {
-        //     $query->where('marketplace_id', $request->marketplace_id);
-        // }
 
-        // return response()->json(
-        //     $query
-        //         ->orderByDesc('sale_date')
-        //         ->orderByDesc('id')
-        //         ->paginate(20)
-        // );
         if ($request->filled('marketplace_id')) {
             $query->where('marketplace_id', $request->marketplace_id);
         }
