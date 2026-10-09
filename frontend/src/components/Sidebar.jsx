@@ -39,6 +39,7 @@ const menu = [
     label: "Setting",
     children: [
       { to: "/settings/fees", icon: "percent", label: "Fee Marketplace" },
+      { to: "/settings/order-cost", icon: "package_2", label: "Biaya per Pesanan" },
       { to: "/users", icon: "group", label: "Pengguna", adminOnly: true },
     ],
   },

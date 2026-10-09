@@ -20,6 +20,7 @@ class Sale extends Model
         'profit',
         'status',
         'completed_at',
+        'packing_cost',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class Sale extends Model
         'other_fee' => 'decimal:2',
         'profit' => 'decimal:2',
         'completed_at' => 'datetime',
+        'packing_cost' => 'decimal:2',
     ];
 
     public function marketplace()

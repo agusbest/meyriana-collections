@@ -18,6 +18,7 @@ const STATUS_LABEL = {
   pending: "Diproses",
   completed: "Dana Dicairkan",
   cancelled: "Dibatalkan",
+  returned: "Retur",
 };
 
 // Bungkus tiap sel CSV supaya koma/kutip/baris baru di dalam nilai tidak merusak format
@@ -51,12 +52,14 @@ export default function Dashboard() {
   const [marketplaces, setMarketplaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({});
+  const [chartFilters, setChartFilters] = useState({});
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
 
   function loadDashboard(nextFilters = {}) {
     setLoading(true);
     setFilters(nextFilters);
+    setChartFilters(nextFilters); // grafik ikut filter yang baru dipilih
     client.get("/dashboard", { params: nextFilters }).then((res) => {
       setSummary(res.data);
       setLoading(false);
@@ -93,6 +96,7 @@ export default function Dashboard() {
         "Modal (HPP)",
         "Fee Marketplace",
         "Biaya Lain",
+        "Biaya Packing",
         "Profit",
       ];
 
@@ -105,6 +109,7 @@ export default function Dashboard() {
         Number(sale.total_cost ?? 0),
         Number(sale.marketplace_fee ?? 0),
         Number(sale.other_fee ?? 0),
+        Number(sale.packing_cost ?? 0),
         Number(sale.profit ?? 0),
       ]);
 
@@ -117,6 +122,7 @@ export default function Dashboard() {
         sales.reduce((sum, s) => sum + Number(s.total_cost ?? 0), 0),
         sales.reduce((sum, s) => sum + Number(s.marketplace_fee ?? 0), 0),
         sales.reduce((sum, s) => sum + Number(s.other_fee ?? 0), 0),
+        sales.reduce((sum, s) => sum + Number(s.packing_cost ?? 0), 0),
         sales.reduce((sum, s) => sum + Number(s.profit ?? 0), 0),
       ];
 
@@ -273,7 +279,7 @@ export default function Dashboard() {
           icon="savings"
           tone="emerald"
           value={formatRupiah(summary.real_profit)}
-          note="Setelah potong HPP & fee marketplace"
+          note="Setelah potong HPP, fee marketplace & biaya packing"
           noteIcon="verified"
         />
       </section>
@@ -328,13 +334,14 @@ export default function Dashboard() {
       {/* Chart + Performa Channel */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-8">
-          <ProfitChart
+          {/* <ProfitChart
             data={[
               { date: "1", gross: 4000000, profit: 900000 },
               { date: "2", gross: 3000000, profit: 700000 },
               { date: "3", gross: 5000000, profit: 1200000 },
             ]}
-          />
+          /> */}
+           <ProfitChart filters={chartFilters} />
         </div>
         <ChannelPerformance channels={summary.by_marketplace ?? []} />
       </section>

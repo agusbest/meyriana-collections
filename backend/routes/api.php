@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Controllers\Api\DashboardTrendController;
+use App\Http\Controllers\Api\OrderCostSettingController;
 use Illuminate\Support\Facades\Route;
 
 // Public
@@ -63,10 +65,13 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
 
     // Biaya operasional
     Route::apiResource('operational-expenses', OperationalExpenseController::class);
+    Route::get('/settings/order-cost', [OrderCostSettingController::class, 'show']);
+    Route::put('/settings/order-cost', [OrderCostSettingController::class, 'update']);
 
     // Khusus admin (grup ini DI DALAM grup login)
     Route::middleware(EnsureUserIsAdmin::class)->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
+        Route::get('/dashboard/trend', DashboardTrendController::class);
         Route::apiResource('users', UserController::class)->except(['show']);
     });
 });

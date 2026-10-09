@@ -102,6 +102,15 @@ class DashboardService
             $query->whereDate('expense_date', '<=', $filters['date_to']);
         }
 
+        // Kategori yang sudah dihitung lewat Biaya per Pesanan tidak dipotong lagi
+        $covered = \App\Models\AppSetting::packingCoveredCategories();
+        if ($covered) {
+            $query->whereRaw(
+                'LOWER(category) NOT IN (' . implode(',', array_fill(0, count($covered), '?')) . ')',
+                $covered
+            );
+        }
+
         return (float) $query->sum('amount');
     }
 }

@@ -153,10 +153,10 @@ export default function SaleDetailModal({ open, sale, onClose }) {
                         : "Biaya tetap"}
                     </p>
                   </div>
-
                   <span className="font-tnum text-amber-700">
                     {formatRupiah(fee.amount)}
                   </span>
+                  Biaya packing: {formatRupiah(sale.packing_cost)}
                 </div>
               ))}
             </div>

@@ -16,6 +16,7 @@ import Listings from "./pages/Listings";
 import ImportShopee from "./pages/ImportShopee";
 import Expenses from "./pages/Expenses";
 import Fees from "./pages/Fees";
+import OrderCost from "./pages/OrderCost";
 
 export default function App() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="/listings/import" element={<ImportShopee />} />
             <Route path="/sales" element={<Sales />} />
             <Route path="/settings/fees" element={<Fees />} />
+            <Route path="/settings/order-cost" element={<OrderCost />} />
             <Route path="/expenses" element={<Expenses />} />
           </Route>
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AppSetting;
 use App\Models\MarketplaceFee;
 use App\Models\ProductVariant;
 use App\Models\Sale;
@@ -124,13 +125,20 @@ class SaleService
             }
 
             $otherFee = (float) ($data['other_fee'] ?? 0);
-            $profit = $totalSales - $totalCost - $marketplaceFeeTotal - $otherFee;
+
+            // Biaya packing per pesanan (Setting -> Biaya per Pesanan), di-snapshot ke pesanan ini
+            $packingCost = array_key_exists('packing_cost', $data)
+                ? max(0, (float) $data['packing_cost'])
+                : AppSetting::packingCostPerOrder();
+
+            $profit = $totalSales - $totalCost - $marketplaceFeeTotal - $otherFee - $packingCost;
 
             $sale->update([
                 'total_sales' => $totalSales,
                 'total_cost' => $totalCost,
                 'marketplace_fee' => $marketplaceFeeTotal,
                 'other_fee' => $otherFee,
+                'packing_cost' => $packingCost,
                 'profit' => $profit,
             ]);
 

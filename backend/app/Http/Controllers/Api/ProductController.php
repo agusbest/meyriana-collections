@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ProductRequest;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SaleItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -213,31 +214,37 @@ class ProductController extends Controller
 
     /**
      * GET /api/products/{product}/profit
+     * Laba per produk dari pesanan berstatus Dana Dicairkan (completed).
+     * Fee marketplace dan biaya packing pesanan dibagi ke produk ini sesuai porsi omzetnya di pesanan.
      */
     public function profit(Product $product)
     {
-        $items = $product->saleItems()
-            ->whereHas('sale', fn($q) => $q->where('status', 'completed'))
-            ->with('sale.fees')
+        // sale_items menunjuk ke varian, jadi ambil lewat semua varian produk ini
+        $items = SaleItem::query()
+            ->whereIn('product_variant_id', $product->variants()->pluck('id'))
+            ->whereHas('sale', fn ($q) => $q->where('status', 'completed'))
+            ->with('sale')
             ->get();
 
         $totalQty = $items->sum('qty');
-        $totalSales = $items->sum('subtotal');
-        $totalCost = $items->sum('cost_total');
+        $totalSales = (float) $items->sum('subtotal');
+        $totalCost = (float) $items->sum('cost_total');
 
-        $marketplaceFee = 0;
+        $marketplaceFee = 0.0;
+        $packing = 0.0;
 
         foreach ($items->groupBy('sale_id') as $saleItemsGroup) {
             $sale = $saleItemsGroup->first()->sale;
 
-            if ($sale->total_sales > 0) {
-                $productShare =
-                    $saleItemsGroup->sum('subtotal')
-                    / $sale->total_sales;
-
-                $marketplaceFee +=
-                    $sale->marketplace_fee * $productShare;
+            if ((float) $sale->total_sales <= 0) {
+                continue;
             }
+
+            // Porsi produk ini dari total omzet pesanan (0..1)
+            $productShare = $saleItemsGroup->sum('subtotal') / (float) $sale->total_sales;
+
+            $marketplaceFee += (float) $sale->marketplace_fee * $productShare;
+            $packing += (float) ($sale->packing_cost ?? 0) * $productShare;
         }
 
         return response()->json([
@@ -246,10 +253,8 @@ class ProductController extends Controller
             'total_sales' => round($totalSales, 2),
             'total_cost' => round($totalCost, 2),
             'marketplace_fee' => round($marketplaceFee, 2),
-            'profit' => round(
-                $totalSales - $totalCost - $marketplaceFee,
-                2
-            ),
+            'packing_cost' => round($packing, 2),
+            'profit' => round($totalSales - $totalCost - $marketplaceFee - $packing, 2),
         ]);
     }
 }
