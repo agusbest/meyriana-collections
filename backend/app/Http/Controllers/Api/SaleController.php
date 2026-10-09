@@ -93,4 +93,16 @@ class SaleController extends Controller
 
         return response()->json($this->saleService->cancel($sale));
     }
+
+    /**
+     * POST /api/sales/{sale}/return
+     */
+    public function markReturned(Sale $sale)
+    {
+        if (! in_array($sale->status, ['pending', 'completed'], true)) {
+            return response()->json(['message' => 'Hanya pesanan Diproses atau Dana Dicairkan yang bisa diretur'], 422);
+        }
+
+        return response()->json($this->saleService->markReturned($sale));
+    }
 }

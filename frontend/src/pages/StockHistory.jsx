@@ -18,6 +18,10 @@ const TYPE_LABEL = {
     label: "Penyesuaian",
     color: "bg-surface-container text-on-surface-variant border-transparent",
   },
+  return_in: {
+    label: "Retur (Masuk)",
+    color: "bg-amber-50 text-amber-800 border-amber-200",
+  },
 };
 
 const REFERENCE_LABEL = {
@@ -200,7 +204,8 @@ export default function StockHistory() {
 
             {!loading &&
               histories.map((history) => {
-                const variant = history.product_variant ?? history.productVariant;
+                const variant =
+                  history.product_variant ?? history.productVariant;
 
                 const type = TYPE_LABEL[history.type] ?? {
                   label: history.type,

@@ -26,6 +26,7 @@ const STATUS_LABEL = {
   pending: "Diproses",
   completed: "Dana Dicairkan",
   cancelled: "Dibatalkan",
+  returned: "Retur",
 };
 
 export default function SaleDetailModal({ open, sale, onClose }) {
@@ -185,7 +186,9 @@ export default function SaleDetailModal({ open, sale, onClose }) {
           {Number(sale.other_fee) > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-on-surface-variant">Biaya lain</span>
-              <span className="font-tnum">- {formatRupiah(sale.other_fee)}</span>
+              <span className="font-tnum">
+                - {formatRupiah(sale.other_fee)}
+              </span>
             </div>
           )}
 

@@ -43,6 +43,33 @@ const STATUS_STYLE = {
     icon: "cancel",
     color: "bg-error-container text-on-error-container",
   },
+  returned: {
+    label: "Retur",
+    icon: "assignment_return",
+    color: "bg-amber-50 text-amber-800 border border-amber-200",
+  },
+};
+
+// Aksi yang mengembalikan stok: batal (sebelum dikirim) dan retur (setelah dikirim/selesai)
+const RESTOCK_ACTION = {
+  cancel: {
+    url: (sale) => `/sales/${sale.id}/cancel`,
+    title: "Batalkan Pesanan",
+    message: (sale) =>
+      `Batalkan pesanan ${sale.order_number}? Stok semua item akan dikembalikan.`,
+    confirmLabel: "Batalkan Pesanan",
+    done: (sale) => `Pesanan ${sale.order_number} dibatalkan, stok dikembalikan`,
+    failed: "Gagal membatalkan pesanan.",
+  },
+  return: {
+    url: (sale) => `/sales/${sale.id}/return`,
+    title: "Retur Pesanan",
+    message: (sale) =>
+      `Retur seluruh pesanan ${sale.order_number}? Semua item kembali ke stok dan pesanan ini tidak lagi dihitung sebagai penjualan.`,
+    confirmLabel: "Retur Pesanan",
+    done: (sale) => `Pesanan ${sale.order_number} diretur, stok dikembalikan`,
+    failed: "Gagal meretur pesanan.",
+  },
 };
 
 export default function Sales() {
@@ -69,7 +96,7 @@ export default function Sales() {
 
   const [busyId, setBusyId] = useState(null);
 
-  const [toCancel, setToCancel] = useState(null);
+  const [toCancel, setToCancel] = useState(null); // { sale, action: "cancel" | "return" }
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
 
@@ -201,31 +228,30 @@ export default function Sales() {
     }
   }
 
-  function askCancel(sale) {
+  function askRestock(sale, action) {
     setCancelError("");
-    setToCancel(sale);
+    setToCancel({ sale, action });
   }
 
   async function confirmCancel() {
     if (!toCancel) return;
 
+    const { sale } = toCancel;
+    const action = RESTOCK_ACTION[toCancel.action];
+
     setCancelling(true);
     setCancelError("");
 
     try {
-      await client.post(`/sales/${toCancel.id}/cancel`);
-
-      const order = toCancel.order_number;
+      await client.post(action.url(sale));
 
       setToCancel(null);
 
-      setToast({ text: `Pesanan ${order} dibatalkan, stok dikembalikan` });
+      setToast({ text: action.done(sale) });
 
       reload();
     } catch (err) {
-      setCancelError(
-        err.response?.data?.message ?? "Gagal membatalkan pesanan.",
-      );
+      setCancelError(err.response?.data?.message ?? action.failed);
     } finally {
       setCancelling(false);
     }
@@ -283,6 +309,7 @@ export default function Sales() {
               <option value="pending">Diproses</option>
               <option value="completed">Dana Dicairkan</option>
               <option value="cancelled">Dibatalkan</option>
+              <option value="returned">Retur</option>
             </select>
 
             <button
@@ -442,7 +469,7 @@ export default function Sales() {
                               <button
                                 type="button"
                                 disabled={busyId === sale.id}
-                                onClick={() => askCancel(sale)}
+                                onClick={() => askRestock(sale, "cancel")}
                                 title="Batalkan pesanan"
                                 aria-label="Batalkan"
                                 className="p-1.5 rounded-lg text-error hover:bg-error-container/40 transition-colors disabled:opacity-40"
@@ -452,6 +479,22 @@ export default function Sales() {
                                 </span>
                               </button>
                             </>
+                          )}
+
+                          {(sale.status === "pending" ||
+                            sale.status === "completed") && (
+                            <button
+                              type="button"
+                              disabled={busyId === sale.id}
+                              onClick={() => askRestock(sale, "return")}
+                              title="Retur (barang dikembalikan pembeli)"
+                              aria-label="Retur"
+                              className="p-1.5 rounded-lg text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                assignment_return
+                              </span>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -519,13 +562,13 @@ export default function Sales() {
 
       <ConfirmDialog
         open={Boolean(toCancel)}
-        title="Batalkan Pesanan"
+        title={toCancel ? RESTOCK_ACTION[toCancel.action].title : ""}
         message={
-          toCancel
-            ? `Batalkan pesanan ${toCancel.order_number}? Stok semua item akan dikembalikan.`
-            : ""
+          toCancel ? RESTOCK_ACTION[toCancel.action].message(toCancel.sale) : ""
         }
-        confirmLabel="Batalkan Pesanan"
+        confirmLabel={
+          toCancel ? RESTOCK_ACTION[toCancel.action].confirmLabel : ""
+        }
         busy={cancelling}
         error={cancelError}
         onConfirm={confirmCancel}

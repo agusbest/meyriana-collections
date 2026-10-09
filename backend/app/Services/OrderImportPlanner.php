@@ -199,6 +199,7 @@ class OrderImportPlanner
                     $result['message'] = match ($current) {
                         'completed' => 'Sudah ada dan sudah selesai.',
                         'cancelled' => 'Sudah ada dan sudah dibatalkan.',
+                        'returned' => 'Sudah ada dan sudah diretur.',
                         'other' => 'Nomor pesanan sudah dipakai marketplace lain.',
                         default => 'Sudah ada, status di file belum selesai.',
                     };

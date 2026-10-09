@@ -148,9 +148,33 @@ class SaleService
         return $sale;
     }
 
+    /** Batal sebelum dikirim: semua stok kembali, status "cancelled". */
     public function cancel(Sale $sale): Sale
     {
-        return DB::transaction(function () use ($sale) {
+        return $this->restock($sale, 'cancelled', 'sale_cancel_in');
+    }
+
+    /**
+     * Retur (versi sederhana): seluruh pesanan diretur dan semua barang kembali ke stok.
+     * Status jadi "returned", sehingga tidak dihitung lagi sebagai penjualan/laba di Dashboard.
+     */
+    public function markReturned(Sale $sale): Sale
+    {
+        return $this->restock($sale, 'returned', 'return_in');
+    }
+
+    private function restock(Sale $sale, string $status, string $historyType): Sale
+    {
+        return DB::transaction(function () use ($sale, $status, $historyType) {
+            // Kunci baris penjualan dan cek ulang status, supaya stok tidak dikembalikan dua kali
+            $sale = Sale::whereKey($sale->id)->lockForUpdate()->firstOrFail();
+
+            if (in_array($sale->status, ['cancelled', 'returned'], true)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Stok pesanan ini sudah pernah dikembalikan.',
+                ]);
+            }
+
             $sale->load('items');
 
             foreach ($sale->items->sortBy('product_variant_id') as $item) {
@@ -168,7 +192,7 @@ class SaleService
 
                 StockHistory::create([
                     'product_variant_id' => $variant->id,
-                    'type' => 'sale_cancel_in',
+                    'type' => $historyType,
                     'qty' => $item->qty,
                     'stock_before' => $before,
                     'stock_after' => $before + $item->qty,
@@ -177,7 +201,7 @@ class SaleService
                 ]);
             }
 
-            $sale->update(['status' => 'cancelled']);
+            $sale->update(['status' => $status]);
 
             return $sale->load(['marketplace', 'items.productVariant.product', 'fees']);
         });

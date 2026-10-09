@@ -47,6 +47,7 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
     Route::apiResource('sales', SaleController::class)->only(['index', 'store', 'show']);
     Route::post('/sales/{sale}/complete', [SaleController::class, 'complete']);
     Route::post('/sales/{sale}/cancel', [SaleController::class, 'cancel']);
+    Route::post('/sales/{sale}/return', [SaleController::class, 'markReturned']);
 
     // Stock history
     Route::get('/stock-histories', [StockHistoryController::class, 'index']);
